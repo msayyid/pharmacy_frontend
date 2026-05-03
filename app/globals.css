@@ -1,1 +1,255 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  /* ============================================================
+   * Color — brand (medical blue)
+   * Source of truth: DESIGN_BLUEPRINT §4.2
+   * ============================================================ */
+  --color-brand-50: #eef5fb;
+  --color-brand-100: #d6e7f4;
+  --color-brand-200: #a6c8e5;
+  --color-brand-300: #74a8d5;
+  --color-brand-400: #3f87c2;
+  --color-brand-500: #1a6fb0;
+  --color-brand-600: #155e97;
+  --color-brand-700: #114e7e;
+  --color-brand-800: #0d3d63;
+  --color-brand-900: #0a2d49;
+
+  /* ============================================================
+   * Color — ink (warm neutrals; never pure gray)
+   * DESIGN §4.3
+   * ============================================================ */
+  --color-ink-50: #f7f8f9;
+  --color-ink-100: #eff1f3;
+  --color-ink-200: #e1e4e7;
+  --color-ink-300: #c4c8cd;
+  --color-ink-400: #9da3aa;
+  --color-ink-500: #7b8189;
+  --color-ink-600: #586068;
+  --color-ink-700: #404650;
+  --color-ink-800: #2b3038;
+  --color-ink-900: #1a1d22;
+  --color-ink-950: #0f1115;
+
+  /* ============================================================
+   * Color — surfaces (warm whites)
+   * DESIGN §4.4
+   * ============================================================ */
+  --color-surface-base: #fafbfc;
+  --color-surface-card: #ffffff;
+  --color-surface-sunken: #f2f4f6;
+  --color-surface-tint: #f4f8fb;
+
+  /* ============================================================
+   * Color — semantic (functional only)
+   * DESIGN §4.5
+   * ============================================================ */
+  --color-success-100: #e0f0e7;
+  --color-success-500: #2e7d54;
+  --color-warning-100: #fbf1dc;
+  --color-warning-500: #b97a12;
+  --color-danger-100: #fbe5e8;
+  --color-danger-500: #b73448;
+
+  /* ============================================================
+   * Color — pharmacy domain
+   * DESIGN §4.6
+   * ============================================================ */
+  --color-stock-in: #2e7d54;
+  --color-stock-out: #b73448;
+  --color-rx-flag: #7b5bab;
+  --color-cold-chain: #0e7c8c;
+
+  /* ============================================================
+   * Type scale (mobile values; desktop overrides via @media below)
+   * DESIGN §5.2
+   * ============================================================ */
+  --text-display: 32px;
+  --text-h1: 28px;
+  --text-h2: 24px;
+  --text-h3: 20px;
+  --text-h4: 18px;
+  --text-body-lg: 17px;
+  --text-body: 15px;
+  --text-body-sm: 14px;
+  --text-caption: 13px;
+  --text-micro: 12px;
+
+  /* ============================================================
+   * Border radius — DESIGN §9.3 source of truth.
+   * shadcn's @theme inline tried to override these via a single --radius
+   * scalar + calc() ladder; that block is intentionally NOT present here.
+   * ============================================================ */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-pill: 9999px;
+
+  /* ============================================================
+   * Elevation
+   * DESIGN §9.1
+   * ============================================================ */
+  --shadow-elev1: 0 1px 2px rgba(15, 17, 21, 0.04), 0 1px 1px rgba(15, 17, 21, 0.03);
+  --shadow-elev2: 0 4px 8px rgba(15, 17, 21, 0.06), 0 1px 2px rgba(15, 17, 21, 0.04);
+  --shadow-elev3: 0 12px 24px rgba(15, 17, 21, 0.08), 0 2px 4px rgba(15, 17, 21, 0.04);
+  --shadow-elev4: 0 24px 48px rgba(15, 17, 21, 0.12), 0 4px 8px rgba(15, 17, 21, 0.06);
+
+  /* ============================================================
+   * Easing
+   * DESIGN §10.3
+   * ============================================================ */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(0.3, 0, 0, 1);
+  --ease-decelerate: cubic-bezier(0, 0, 0, 1);
+  --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
+
+  /* ============================================================
+   * Font families — wired by next/font in app/layout.tsx.
+   * --font-sans MUST resolve to Inter; never Geist.
+   * ============================================================ */
+  --font-sans: var(--font-inter), -apple-system, system-ui, sans-serif;
+  --font-mono:
+    var(--font-jetbrains-mono), SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    monospace;
+  --font-serif: var(--font-dm-serif), Georgia, serif;
+}
+
+/* ============================================================
+ * shadcn semantic var mapping (D4 hybrid; see DECISION_LOG 2026-05-03).
+ * shadcn components keep using bg-primary, bg-card, text-muted-foreground
+ * etc. — those names resolve here to OUR brand tokens at the CSS layer.
+ * Updating a brand token in @theme above propagates everywhere.
+ * ============================================================ */
+:root {
+  --background: var(--color-surface-base);
+  --foreground: var(--color-ink-900);
+  --card: var(--color-surface-card);
+  --card-foreground: var(--color-ink-900);
+  --popover: var(--color-surface-card);
+  --popover-foreground: var(--color-ink-900);
+  --primary: var(--color-brand-500);
+  --primary-foreground: var(--color-surface-card);
+  --secondary: var(--color-surface-tint);
+  --secondary-foreground: var(--color-brand-700);
+  --muted: var(--color-ink-100);
+  --muted-foreground: var(--color-ink-500);
+  --accent: var(--color-surface-tint);
+  --accent-foreground: var(--color-brand-700);
+  --destructive: var(--color-danger-500);
+  --destructive-foreground: var(--color-surface-card);
+  --border: var(--color-ink-200);
+  --input: var(--color-ink-200);
+  --ring: var(--color-brand-500);
+  --chart-1: var(--color-brand-500);
+  --chart-2: var(--color-brand-300);
+  --chart-3: var(--color-success-500);
+  --chart-4: var(--color-warning-500);
+  --chart-5: var(--color-danger-500);
+  --sidebar: var(--color-surface-base);
+  --sidebar-foreground: var(--color-ink-900);
+  --sidebar-primary: var(--color-brand-500);
+  --sidebar-primary-foreground: var(--color-surface-card);
+  --sidebar-accent: var(--color-surface-tint);
+  --sidebar-accent-foreground: var(--color-brand-700);
+  --sidebar-border: var(--color-ink-200);
+  --sidebar-ring: var(--color-brand-500);
+}
+
+/* Expose shadcn semantic vars as Tailwind utilities so bg-primary, bg-card,
+ * text-muted-foreground, etc. resolve to the mapped values above. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* ============================================================
+ * Desktop type-scale overrides — heading sizes step up.
+ * DESIGN §5.2 (right column)
+ * ============================================================ */
+@media (min-width: 1024px) {
+  :root {
+    --text-display: 48px;
+    --text-h1: 36px;
+    --text-h2: 28px;
+    --text-h3: 22px;
+  }
+}
+
+/* ============================================================
+ * Motion durations — consumed inline in CSS transitions, not as utilities.
+ * DESIGN §10.2
+ * ============================================================ */
+:root {
+  --duration-instant: 80ms;
+  --duration-quick: 160ms;
+  --duration-base: 240ms;
+  --duration-slow: 360ms;
+  --duration-deliberate: 500ms;
+}
+
+/* Reduced motion — zero out durations.
+ * DESIGN §10.5 ("respect prefers-reduced-motion: reduce") */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-instant: 0ms;
+    --duration-quick: 0ms;
+    --duration-base: 0ms;
+    --duration-slow: 0ms;
+    --duration-deliberate: 0ms;
+  }
+}
+
+/* ============================================================
+ * Base document styles
+ * DESIGN §5.4 (tabular-nums by default for prices)
+ * ============================================================ */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    color: var(--color-ink-900);
+    background: var(--color-surface-base);
+    font-family: var(--font-sans);
+    font-feature-settings: "tnum" 1;
+  }
+  body {
+    min-height: 100dvh;
+  }
+}

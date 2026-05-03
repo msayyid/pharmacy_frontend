@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 32" width="140" height="32" role="img" aria-label="Nookat (placeholder logo, monochrome)" fill="currentColor">
+  <g transform="rotate(-25 16 16)">
+    <rect x="6" y="13" width="20" height="6" rx="3" fill="currentColor" />
+  </g>
+  <text
+    x="40"
+    y="23"
+    font-family="'DM Serif Display', Georgia, 'Times New Roman', serif"
+    font-size="22"
+    font-weight="400"
+    fill="currentColor"
+    letter-spacing="0.5"
+  >Nookat</text>
+</svg>

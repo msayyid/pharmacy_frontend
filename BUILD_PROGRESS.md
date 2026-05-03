@@ -6,20 +6,20 @@
 
 ## Current state
 
-- **Active phase:** Phase 2 — Design System Implementation _(awaiting plan)_
-- **Status:** Phase 1 complete; Phase 2 plan due before any Phase 2 code.
+- **Active phase:** Phase 3 — API Client + Type Generation _(awaiting plan)_
+- **Status:** Phase 2 complete; Phase 3 plan due before any Phase 3 code.
 - **Last session:** 2026-05-03
-- **Sub-phases done:** Phase 0 (master plan + resolved questions); Phase 1A-1F (Next.js 16 bootstrap, ESLint/Prettier/Husky, Vitest + Playwright, Sentry skeleton, /api/health, Dockerfile, GitHub Actions CI). All Phase 1 verification gates green.
-- **Next session should:** read the Phase 2 prompt in `FRONTEND_CLAUDE_CODE_PROMPTS.md §Phase 2`, re-read `DESIGN_BLUEPRINT §1, §4-§11, §20-§21`, and post a Phase 2 plan in chat (brand tokens in CSS vars + Tailwind theme, placeholder Nookat logo SVGs, base shadcn primitives customized to brand, `lib/brand.ts` constants). No code until the plan is approved.
+- **Sub-phases done:** Phase 0 (master plan); Phase 1A-1F (Next.js 16 foundation); Phase 2A-2F (brand tokens + 4 logo SVGs + shadcn pinned to Radix + Button/Badge/Card customizations + 5 composed-component skeletons + kitchen-sink dev page + 23 component/E2E tests). All Phase 2 verification gates green; v0.2.0 tagged.
+- **Next session should:** read `FRONTEND_CLAUDE_CODE_PROMPTS.md §Phase 3`, re-read `FRONTEND_BLUEPRINT §6 (backend API integration)`, `§7 (type generation)`, `§14 (error handling)`, `§15 (caching)`, `§19 (observability)`, fetch backend `app/main.py`, `app/core/errors.py`, `app/api/errors.py`, `app/core/config.py`, and `${API_URL}/openapi.json`. Then post a Phase 3 plan covering the `openapi-typescript` + `openapi-fetch` pipeline, `ApiError` parsing, RSC vs client fetcher variants, request-ID propagation, and the `pnpm types:check` CI gate. No code until plan is approved.
 
 ---
 
 ## Phases
 
 - [x] Phase 0 — Spec Comprehension & Master Plan _(done 2026-05-03)_
-- [x] Phase 1 — Project Foundation _(done 2026-05-03)_
-- [ ] Phase 2 — Design System Implementation
-- [ ] Phase 3 — API Client + Type Generation
+- [x] Phase 1 — Project Foundation _(done 2026-05-03; v0.1.0)_
+- [x] Phase 2 — Design System Implementation _(done 2026-05-03; v0.2.0)_
+- [ ] Phase 3 — API Client + Type Generation _(active — plan pending)_
 - [ ] Phase 4 — i18n Foundation
 - [ ] Phase 5 — Auth & Account
 - [ ] Phase 6 — Catalog Browse (read-only)
