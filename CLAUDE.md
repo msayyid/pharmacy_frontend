@@ -76,7 +76,7 @@ Anything not in any spec is an **open question**. Log it in `OPEN_QUESTIONS.md`,
 8. **Run before declaring done.** Code that wasn't executed isn't done. Build it. Run it. Hit the page.
 9. **Conventional Commits, always.** `type(scope): subject` — see §Commits below.
 10. **Never invent API shapes.** Always fetch from `openapi-typescript` against the live backend OpenAPI. The generated types are the contract.
-11. **Phase-boundary push to `main` is automatic after a green verification gate.** At every phase close, after `pnpm lint` / `typecheck` / `test` / `build` / `e2e` / `docker` (where relevant) all return exit 0, commit with Conventional Commits and `git push origin main` without asking permission. Then create the annotated semver tag `v0.N.0` for Phase N (Phase 12 = `v1.0.0-rc1`) and push the tag. **Carve-outs that still require explicit approval:** anything red on the verification gate (stop and surface — never push partial work), `--force` / `--force-with-lease` pushes, history rewrites (filter-branch / rebase past pushed commits), branch / tag deletions, and any push to a branch other than `main`. Mid-phase commits to feature branches may push freely; mid-phase commits to `main` should not happen at all.
+11. **Phase-boundary push to `main` is automatic after a green verification gate.** At every phase close, after `pnpm lint` / `typecheck` / `test` / `build` / **`build:ci`** / `e2e` / `docker` (where relevant) all return exit 0, commit with Conventional Commits and `git push origin main` without asking permission. Then create the annotated semver tag `v0.N.0` for Phase N (Phase 12 = `v1.0.0-rc1`) and push the tag. **Carve-outs that still require explicit approval:** anything red on the verification gate (stop and surface — never push partial work), `--force` / `--force-with-lease` pushes, history rewrites (filter-branch / rebase past pushed commits), branch / tag deletions, and any push to a branch other than `main`. Mid-phase commits to feature branches may push freely; mid-phase commits to `main` should not happen at all. **The local gate must approximate CI's environment** — specifically, `pnpm build:ci` must run successfully without `.env.local` and without env vars set in the developer's interactive shell. If the gate is green only because of dev-only env, **the gate is a false-green and the contract is not satisfied**. Fix CI's env injection (or remove the build-time dependency) before pushing.
 
 ### Commit attribution
 
@@ -112,12 +112,23 @@ You are FORBIDDEN from reporting a task complete until you have:
 - [ ] `pnpm typecheck` clean (`tsc --noEmit`)
 - [ ] `pnpm lint` clean (ESLint)
 - [ ] `pnpm build` succeeds (Next.js production build)
+- [ ] **`pnpm build:ci` succeeds** — this is `pnpm build` with `.env.local` moved aside and `process.env` stripped to a minimal `HOME` / `PATH` / `SHELL` set, mirroring the GitHub Actions runner's environment. Skipping this step makes the local gate a false-green: a developer's `.env.local` masks build-time env dependencies that CI lacks. **The phase-close push gate is not satisfied without `build:ci` exit 0.**
 - [ ] For type-generation changes: `pnpm types:generate` ran and committed; `pnpm types:check` clean
 - [ ] For new pages: the page renders in dev (`pnpm dev`); curl or browser-fetch confirms 200
 - [ ] For new client interactions: the flow exercises end-to-end in dev (try the actual button click)
 - [ ] For phase boundaries: the smoke recipe in `BUILD_PROGRESS.md` for that phase runs end-to-end against a fresh build
 
 If a check is genuinely impossible (e.g., backend not running locally), state explicitly which check was skipped and why. **Never** say "this should work" or "the test should pass" — run it.
+
+#### When `pnpm build:ci` fails
+
+If the strip-env build crashes with a missing-env error (the kind that doesn't reproduce under `pnpm build` alone), the answer is **never** "add the var to `.env.local`." Three legitimate fixes, in preference order:
+
+1. **Add the var to CI's workflow env** (`.github/workflows/ci.yml`'s top-level `env:` block) — when the var is genuinely required at build time and a CI-safe placeholder value exists. Real prod values come from the deploy environment (Coolify), not from CI; CI defaults must match `vitest.config.ts > test.env` for consistency.
+2. **Refactor away the build-time env dependency** — when the value is only needed at request time. Mark the consuming route `export const dynamic = "force-dynamic"` and access env at request time so the import chain doesn't crash during `next build`'s page-data collection.
+3. **Make the env field optional in the Zod schema** — last resort, only when the field is truly optional in production too. Defaulting required fields silently defeats the "fail loud on import" design and masks real misconfiguration.
+
+The lesson: **"ran locally" ≠ "passes in CI."** Local `.env.local` is a developer convenience; CI is the contract.
 
 ### OpenAPI sync
 

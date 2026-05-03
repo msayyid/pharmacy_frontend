@@ -94,6 +94,18 @@
 **Impact.** Medium — full outage if VPS down.
 **Mitigation.** Cloudflare in front of FE Caddy/Traefik (CDN edge serves cached homepage / static assets even if origin down). HA roadmap is Phase-2 (post-MVP) per backend `RISKS.md`.
 
+## R-12 — `/api/diag` route crashes at request time when env is missing 🟡
+
+**Raised:** 2026-05-03 (Phase 3 CI postmortem)
+**Description.** `app/api/diag/route.ts` imports `createServerApiClient` → `lib/api/server.ts` → `lib/env/server.ts`, which Zod-parses `process.env.API_URL` **at module load**. The route is currently safe in CI because (a) Phase 3's CI fix injects `API_URL` at the build/runtime workflow level, and (b) E2E tests visit only `/` and `/kitchen-sink`, never `/api/diag`. **But:** if a developer (or an ops smoke-test, or a misconfigured Coolify deploy on staging) hits `/api/diag` in any environment where `API_URL` isn't set, the route crashes with a 500 — and because the import happens at module load, the whole route handler module fails to instantiate, not just the request.
+**Likelihood.** Low (today). Medium once Coolify staging is wired (Phase 12) — env-misconfiguration on a fresh deploy is a known-known.
+**Impact.** Low — the route is dev/staging-only, gated by `NEXT_PUBLIC_ENV !== "production"` returning 404 in prod. The crash never reaches a customer. But it's a bad ops experience: a smoke-test against staging would fail in a way that doesn't say "env missing," it just 500s.
+**Mitigation.** Deferred to Phase 11 hardening. Two-part fix:
+
+1. **Add an E2E test that visits `/api/diag` and asserts a 200 with the expected JSON shape.** Catches the import-at-build crash that the existing tests miss.
+2. **Mark `/api/diag` `export const dynamic = "force-dynamic"` AND defer the env access.** The route already has `dynamic = "force-dynamic"` (Phase 3) but its imports still resolve at module-load. Refactor `createServerApiClient` to either lazy-load the env (move the Zod parse into a memoized getter) OR have the diagnostic route access env directly with a fallback message instead of throwing. The cleanest pattern: `try { return JSON.json({...real diagnostic...}) } catch (envError) { return JSON.json({ ok: false, error: "env_missing", ... }, { status: 503 }) }`.
+   **Status.** Monitoring. Acceptable through Phase 10. Phase 11 hardening pass closes both legs.
+
 ---
 
 ## Archived

@@ -12,6 +12,17 @@ concurrency:
 env:
   PNPM_VERSION: 10.33.2
   NODE_VERSION: 20
+  # Build-time env defaults — mirrors vitest.config.ts > test.env so Zod
+  # validation in lib/env/{server,client}.ts doesn't crash module loads
+  # during `next build` page-data collection (Phase 3 D11: fail loud on
+  # import). Real prod values come from the deploy environment (Coolify),
+  # never from CI. CI is logically a "test env" — these defaults match.
+  # Phase 3 fix: 2026-05-03 (commit fd4c608's build job hit ZodError on
+  # /api/diag because no env was injected here).
+  NEXT_PUBLIC_API_URL: http://localhost:8000
+  NEXT_PUBLIC_DEFAULT_LOCALE: ru
+  NEXT_PUBLIC_ENV: test
+  API_URL: http://localhost:8000
 
 jobs:
   lint:

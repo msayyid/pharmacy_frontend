@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:ci": "bash scripts/build-ci.sh",
     "start": "next start",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
