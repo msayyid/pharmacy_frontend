@@ -1,0 +1,22 @@
+.next/
+node_modules/
+out/
+build/
+coverage/
+playwright-report/
+test-results/
+pnpm-lock.yaml
+next-env.d.ts
+*.tsbuildinfo
+
+# /specs/* is read-only per CLAUDE.md (sacred invariant 9).
+specs/
+
+# Project rulebook + master state files are hand-curated; format them only
+# when intentionally edited. Keeping them out of automated rewrites prevents
+# noisy diffs on every commit.
+CLAUDE.md
+MASTER_PLAN.md
+BUILD_PROGRESS.md
+DECISION_LOG.md
+OPEN_QUESTIONS.md
