@@ -144,7 +144,10 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm e2e --project=chromium
+      # @requires-backend tests need a live backend on :8000 (OTP-fishing
+      # from logs). CI doesn't spin one up — those tests are smoke-only,
+      # run locally before phase close per BUILD_PROGRESS.md > After Phase 5.
+      - run: pnpm e2e --project=chromium --grep-invert @requires-backend
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -175,7 +178,8 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ matrix.project }}-${{ hashFiles('pnpm-lock.yaml') }}
       - run: pnpm exec playwright install --with-deps ${{ matrix.project }}
-      - run: pnpm e2e --project=${{ matrix.project }}
+      # See e2e-pr above: @requires-backend tests are gated out of CI.
+      - run: pnpm e2e --project=${{ matrix.project }} --grep-invert @requires-backend
       - if: failure()
         uses: actions/upload-artifact@v4
         with:

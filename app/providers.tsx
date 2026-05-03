@@ -54,7 +54,7 @@ export function AppProviders({ locale, messages, children }: AppProvidersProps) 
 
   return (
     <QueryClientProvider client={queryClient}>
-      <NextIntlClientProvider locale={locale} messages={messages}>
+      <NextIntlClientProvider locale={locale} messages={messages} timeZone="Asia/Bishkek">
         <TooltipPrimitive.Provider>{children}</TooltipPrimitive.Provider>
       </NextIntlClientProvider>
     </QueryClientProvider>
