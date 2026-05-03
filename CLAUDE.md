@@ -76,6 +76,11 @@ Anything not in any spec is an **open question**. Log it in `OPEN_QUESTIONS.md`,
 8. **Run before declaring done.** Code that wasn't executed isn't done. Build it. Run it. Hit the page.
 9. **Conventional Commits, always.** `type(scope): subject` — see §Commits below.
 10. **Never invent API shapes.** Always fetch from `openapi-typescript` against the live backend OpenAPI. The generated types are the contract.
+11. **Phase-boundary push to `main` is automatic after a green verification gate.** At every phase close, after `pnpm lint` / `typecheck` / `test` / `build` / `e2e` / `docker` (where relevant) all return exit 0, commit with Conventional Commits and `git push origin main` without asking permission. Then create the annotated semver tag `v0.N.0` for Phase N (Phase 12 = `v1.0.0-rc1`) and push the tag. **Carve-outs that still require explicit approval:** anything red on the verification gate (stop and surface — never push partial work), `--force` / `--force-with-lease` pushes, history rewrites (filter-branch / rebase past pushed commits), branch / tag deletions, and any push to a branch other than `main`. Mid-phase commits to feature branches may push freely; mid-phase commits to `main` should not happen at all.
+
+### Commit attribution
+
+Every commit in this repo must be authored as `msayyid <201980620+msayyid@users.noreply.github.com>` (the local repo config is already pinned). **Never** add `Co-Authored-By: Claude...` trailers, `🤖 Generated with Claude Code` footers, or any AI-attribution line to commit messages. Conventional Commits subject + body only. If a trailer accidentally lands locally, amend before push; if it lands on the remote, ask before rewriting history.
 
 ---
 
