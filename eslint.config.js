@@ -25,6 +25,15 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    // Node-only scripts (build/check helpers under scripts/) need Node globals
+    // (console, process). They're outside the React/Next.js code path so we
+    // skip the React + jsx-a11y rules.
+    files: ["scripts/**/*.{js,mjs,cjs}"],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
+  {
     files: ["**/*.{ts,tsx}"],
     languageOptions: {
       globals: { ...globals.browser, ...globals.node },

@@ -20,7 +20,8 @@ test.describe("kitchen sink", () => {
       page,
     }) => {
       await page.setViewportSize({ width: breakpoint.width, height: breakpoint.height })
-      await page.goto("/kitchen-sink")
+      // Phase 4: routes are locale-prefixed; kitchen sink lives under /[locale].
+      await page.goto("/ru/kitchen-sink")
       await page.waitForLoadState("networkidle")
       await page.evaluate(() => document.fonts.ready)
 
@@ -47,7 +48,7 @@ test.describe("kitchen sink", () => {
       process.env.NEXT_PUBLIC_ENV !== "production",
       "Production gate is only verifiable when NEXT_PUBLIC_ENV=production at build time.",
     )
-    const response = await page.goto("/kitchen-sink")
+    const response = await page.goto("/ru/kitchen-sink")
     expect(response?.status()).toBe(404)
   })
 })

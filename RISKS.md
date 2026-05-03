@@ -106,6 +106,14 @@
 2. **Mark `/api/diag` `export const dynamic = "force-dynamic"` AND defer the env access.** The route already has `dynamic = "force-dynamic"` (Phase 3) but its imports still resolve at module-load. Refactor `createServerApiClient` to either lazy-load the env (move the Zod parse into a memoized getter) OR have the diagnostic route access env directly with a fallback message instead of throwing. The cleanest pattern: `try { return JSON.json({...real diagnostic...}) } catch (envError) { return JSON.json({ ok: false, error: "env_missing", ... }, { status: 503 }) }`.
    **Status.** Monitoring. Acceptable through Phase 10. Phase 11 hardening pass closes both legs.
 
+## R-13 — Next 16 deprecated `middleware.ts` in favor of `proxy.ts` 🟡
+
+**Raised:** 2026-05-03 (Phase 4)
+**Description.** Next 16 emits `⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.` on every dev-server start. The new `proxy.ts` convention ships in Next 16; the old `middleware.ts` is still functional but slated for removal in a future major. Our `middleware.ts` exists because next-intl 4.11 imports `createMiddleware` from `next-intl/middleware` — the package hasn't published a `proxy.ts` migration yet.
+**Likelihood.** Eventual (Next 17+ may remove `middleware.ts`).
+**Impact.** Low for now (warnings only, fully functional). Medium when removal lands (every locale-prefixed route stops resolving).
+**Mitigation.** Watch upstream. When next-intl publishes a `next-intl/proxy` export (or equivalent), migrate `middleware.ts` → `proxy.ts` in a focused commit. Phase 5 composes auth gates on top of the existing middleware; that work is portable to whichever convention Next 16 / 17 settle on. Pinning Next + next-intl versions in `package.json` already prevents surprise breaks via `pnpm update`.
+
 ---
 
 ## Archived

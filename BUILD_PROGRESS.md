@@ -6,11 +6,11 @@
 
 ## Current state
 
-- **Active phase:** Phase 4 — i18n Foundation _(awaiting plan)_
-- **Status:** Phase 3 complete; Phase 4 plan due before any Phase 4 code.
+- **Active phase:** Phase 5 — Auth & Account _(awaiting plan)_
+- **Status:** Phase 4 complete; Phase 5 plan due before any Phase 5 code.
 - **Last session:** 2026-05-03
-- **Sub-phases done:** Phase 0 (master plan); Phase 1A-1F (Next.js 16 foundation); Phase 2A-2F (brand tokens + 4 logo SVGs + shadcn pinned to Radix + Button/Badge/Card customizations + 5 composed-component skeletons + kitchen-sink dev page); Phase 3A-3F (Zod env schemas + openapi-typescript@7.13 generation + openapi.json snapshot + ApiError class + RSC + client fetcher factories + auth stubs with Phase 5 TODOs + diagnostic route + CI types-check gate + 19 new tests). All Phase 3 gates green; v0.3.0 tagged. **Diagnostic smoke verified end-to-end:** `curl /api/diag` returns real backend health + echoed X-Request-ID.
-- **Next session should:** read `FRONTEND_CLAUDE_CODE_PROMPTS.md §Phase 4`, re-read `DESIGN_BLUEPRINT §17 (voice/tone)`, `§18 (localization)`, `FRONTEND_BLUEPRINT §13 (i18n)`, `PRODUCT_BLUEPRINT §16 (i18n strategy)`, `§21 (critical i18n keys)`. Fetch backend `app/i18n/{ru,ky,en}.json` + `app/core/i18n.py`. Then post a Phase 4 plan covering `next-intl` setup with `[locale]` URL prefix, `messages/*.json` mirrored from backend (~49 keys) + the FE-only namespaces (`nav`, `cta`, `header`, `footer`, etc. — see `MASTER_PLAN §4.2`), locale-aware formatters in `lib/format/{price,date,number,phone}.ts`, and `pnpm i18n:check` script. No code until plan is approved.
+- **Sub-phases done:** Phase 0 (master plan); Phase 1A-1F (Next.js 16 foundation); Phase 2A-2F (brand tokens + shadcn-Radix + composed-component skeletons + kitchen-sink); Phase 3A-3F (typed openapi-fetch client + ApiError + RSC/client fetchers + auth stubs + diagnostic route + CI types-check); fix(ci) post-Phase-3 (build-time env injection in CI workflow + `pnpm build:ci` script + CLAUDE.md amendments around the false-green local gate); Phase 4A-4F (next-intl@4.11 + locale-prefixed `[locale]/...` routing + middleware locale detection + 50-key `messages/{ru,ky,en}.json` with backend dotted-flat parity + locale-aware formatters in `lib/format/{price,date,number,phone}.ts` + LangSwitcher + i18n:check CI gate + 31 new tests). All Phase 4 gates green; v0.4.0 tagged. **i18n smoke:** `/` → `/<accept-language-locale>`, `/ru`/`/ky`/`/en` all 200, `<html lang="ky">` confirmed.
+- **Next session should:** read `FRONTEND_CLAUDE_CODE_PROMPTS.md §Phase 5`, re-read `FRONTEND_BLUEPRINT §8 (auth & sessions)`, `§9.1 (routing)`, `§12 (forms)`, `DESIGN_BLUEPRINT §13.3 (phone input)`, `§13.5 (OTP input)`, `§12.10 (account pages)`, `PRODUCT_BLUEPRINT §8.1 / §8.3` (auth + addresses). Fetch backend `app/api/v1/auth.py`, `app/api/v1/account.py`, `app/domain/identity/{schemas,dependencies}.py`, `app/core/security.py`. Then post a Phase 5 plan covering OTP request/verify flow, `/api/auth/{set-tokens,refresh-tokens,logout}` route handlers (refresh in HttpOnly cookie at our origin per Q-4), single-flight refresh fill-in (replacing the Phase 3 stub in `lib/auth/refresh.ts`), phone input with libphonenumber-js, OTP 6-box paste-aware input, `/me` + `/me/addresses` CRUD, soft/hard auth gates in middleware composed with the existing next-intl middleware, and the **cart-merge sequential re-add workaround** at OTP-verify success per `DECISION_LOG.md` 2026-05-03 entry (OQ-16). No code until plan is approved.
 
 ---
 
@@ -20,9 +20,8 @@
 - [x] Phase 1 — Project Foundation _(done 2026-05-03; v0.1.0)_
 - [x] Phase 2 — Design System Implementation _(done 2026-05-03; v0.2.0)_
 - [x] Phase 3 — API Client + Type Generation _(done 2026-05-03; v0.3.0)_
-- [ ] Phase 4 — i18n Foundation _(active — plan pending)_
-- [ ] Phase 4 — i18n Foundation
-- [ ] Phase 5 — Auth & Account
+- [x] Phase 4 — i18n Foundation _(done 2026-05-03; v0.4.0)_
+- [ ] Phase 5 — Auth & Account _(active — plan pending)_
 - [ ] Phase 6 — Catalog Browse (read-only)
 - [ ] Phase 7 — PDP & Search
 - [ ] Phase 8 — Cart

@@ -76,6 +76,25 @@ jobs:
       # generated/api.d.ts together. See DECISION_LOG.md 2026-05-03 entry.
       - run: pnpm types:check
 
+  i18n-check:
+    name: i18n parity (ru/ky/en)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Asserts every key in messages/ru.json + messages/ky.json + messages/en.json
+      # exists in all three. Per Q-9 in MASTER_PLAN.md: all three locales fully
+      # populated at MVP. KY/EN seed translations are flagged for pre-launch
+      # human review (BUILD_PROGRESS.md > Backlog > Pre-launch).
+      - run: pnpm i18n:check
+
   test:
     name: Unit + component tests
     runs-on: ubuntu-latest

@@ -115,3 +115,48 @@
 **Reversibility.** Easy. The fetcher factories are pure functions; the auth stubs are 5-line files. Replacing the snapshot strategy with a service container is a CI-only change.
 
 **References.** `FRONTEND_BLUEPRINT §6, §7, §14, §15, §19`; `FRONTEND_CLAUDE_CODE_PROMPTS §Phase 3`; backend `app/api/errors.py` for ProblemDetails contract; `app/main.py` for middleware order (RequestId outermost, echoes header); `app/core/config.py` for env names. Phase 3 plan in chat 2026-05-03.
+
+---
+
+### 2026-05-03 — Phase 4: i18n foundation
+**Phase:** 4
+**Context.** Wire `next-intl` for three-locale routing with the message file shape that mirrors the backend's `app/i18n/<lang>.json` exactly so backend ProblemDetails `code` values flow through `t(\`error.\${code}\`)` without translation drift. The user's load-bearing Phase 4 reminder: "the i18n discipline you set in Phase 4 protects the next 8 phases. If the message-key shape mismatches the backend's, every backend error code will fall through to `error.generic` and translation drift will compound."
+
+**Decisions.**
+
+- **D1 — Locale URL strategy: prefix-all.** `/ru/...`, `/ky/...`, `/en/...`; `/` redirects to a negotiated locale via `localeDetection: true`. SEO-explicit; aligns with backend's default-RU resolver.
+
+- **D2 — Message-file shape: dotted-flat keys, mirror backend exactly.** `{"auth.otp.invalid": "..."}` (one-level dictionary with dotted key NAMES) — NOT nested objects (`{auth: {otp: {invalid: "..."}}}`). next-intl supports both; we use flat for backend parity. The user's quote: "If next-intl's preferred shape is nested objects, use the flat-key style anyway for backend parity." `t("auth.otp.invalid")` looks up the literal key string, not a path.
+
+- **D3 — FE-mirrored keys vs FE-only keys.** Mirror backend's 43 non-sms keys (auth.*, cart.*, checkout.*, error.*, order.status.*, product.*, search.*) verbatim. FE adds `brand.{name,about,tagline}` + `ui.locale.*` namespaces. sms.* is server-only (PRODUCT §21.3); FE never resolves it.
+
+- **D4 — Brand keys live in BOTH `lib/brand.ts` AND `messages/<lang>.json`.** lib/brand.ts is for non-translatable contexts (HTML title, OG meta, code-side `BRAND` const). Messages JSON is for `t("brand.name")` UI rendering. Per DESIGN §1.3, the wordmark is "Ноокат" in RU/KY and "Nookat" in EN — both file kinds reflect this (lib/brand.ts via `BRAND.nameLocalized`; messages via per-locale value).
+
+- **D5 — Locale persistence.** `NEXT_LOCALE` cookie via next-intl middleware for guests; `User.preferred_language` for logged-in (Phase 5 wires user pref).
+
+- **D6 — App router restructure.** Moved `<html>+<body>+next/font+NextIntlClientProvider` into `app/[locale]/layout.tsx`. **Deleted `app/layout.tsx` entirely.** Spec-aligned approach (R-A) compiled cleanly under Next 16 — no fallback needed. All rendered pages live under `[locale]`; route handlers (`/api/*`) stay layout-free.
+
+- **D7 — next-intl@4.11.** Latest stable; spec patterns (`requestLocale`, `hasLocale`, `setRequestLocale`) work as written.
+
+- **D8 — Locale-aware formatters.** `lib/format/{price,date,number,phone}.ts`. `formatPrice` swaps NBSP (Intl default) to thin space U+2009 for ru/ky per DESIGN §5.4 + §18.2. `formatDate` uses date-fns. `formatPhoneE164/Display` uses libphonenumber-js with `KG` default region matching backend's `phonenumbers`. PriceTag.tsx refactored to consume `formatPrice` (Phase 2's inline formatter retired).
+
+- **D9 — `pnpm i18n:check`.** `scripts/i18n-check.mjs` (plain ESM JS, no TS toolchain). Loads three JSONs, checks key parity, exits non-zero on drift. CI runs it as a job.
+
+- **D10 — LangSwitcher.** Compact pill switcher in Phase 4 (`components/i18n/LangSwitcher.tsx`); verbose footer version (full names «Русский» / «Кыргызча» / «English») lands in Phase 6 with the Footer component. Path swap via regex (`pathname.replace(/^\/[a-z]{2}/, ...)`) so path is preserved across locale changes.
+
+- **D11 — date-fns has no `ky` locale.** Aliased KY to date-fns's RU locale; `DD.MM.YYYY` is identical between RU and KY per DESIGN §18.2 — zero visible difference. Documented in `lib/format/date.ts`.
+
+- **D12 — KY/EN seed quality.** Backend-mirrored keys are human-curated (PRODUCT §21.2). FE-only `ui.*` + `brand.*` keys for KY/EN are seeded; flagged for the existing pre-launch backlog item per Q-9.
+
+- **D13 — E2E updates.** Homepage spec is locale-agnostic on the `/` redirect (browser Accept-Language varies). New tests assert `<html lang="ky">` / `lang="en"` on direct entries and that the cookie pins subsequent `/` to the most-recently-visited locale. Kitchen-sink spec updated to `/ru/kitchen-sink`.
+
+- **D14 — Brand-grep gate updated.** `messages/<lang>.json` legitimately contains "Nookat" / "Ноокат" under `brand.name` and `brand.about`. The TS/TSX brand grep still must match only `lib/brand.ts`; the messages-JSON matches are expected and not flagged.
+
+**Side findings.**
+- Next 16 prints `The "middleware" file convention is deprecated. Please use "proxy" instead.` next-intl 4.11 still ships `next-intl/middleware` (no proxy export); we keep `middleware.ts` until next-intl publishes a migration path. Logged as `RISKS.md R-13`.
+- ESLint's `**/*.{ts,tsx}` rule didn't apply to `scripts/i18n-check.mjs`, so `console` and `process` raised `no-undef`. Added a `scripts/**/*.{js,mjs,cjs}` block with Node globals; React/jsx-a11y rules don't apply there.
+- Playwright's chromium default Accept-Language is en-US. The first homepage E2E I wrote pinned `/` → `/ru`; reality is `/` → `/en` because of locale negotiation. The corrected test asserts the URL matches `/(ru|ky|en)/?$` and tests pin-to-/ru via direct navigation + cookie persistence.
+
+**Reversibility.** Easy. Backend dotted-flat parity means a future migration to nested-object shape (if next-intl ever requires it) is a one-shot transform script.
+
+**References.** `DESIGN_BLUEPRINT §17, §18`; `FRONTEND_BLUEPRINT §13`; `PRODUCT_BLUEPRINT §16, §21`; `FRONTEND_CLAUDE_CODE_PROMPTS §Phase 4`; backend `app/i18n/{ru,ky,en}.json` and `app/core/i18n.py`. Phase 4 plan in chat 2026-05-03.

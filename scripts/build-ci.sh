@@ -38,7 +38,12 @@ fi
 
 # Strip env to the minimum + add back the CI workflow's defaults. KEEP IN
 # SYNC with .github/workflows/ci.yml top-level env: block.
-exec env -i \
+#
+# IMPORTANT: do NOT use `exec` here. `exec` replaces the script's shell
+# with the env binary, which discards the trap registered above and leaves
+# .env.local stashed in .env.local.build-ci.bak forever. We want the trap
+# to fire on script exit, so run as a child process and capture exit code.
+env -i \
   HOME="$HOME" \
   PATH="$PATH" \
   SHELL="${SHELL:-/bin/bash}" \
@@ -47,3 +52,7 @@ exec env -i \
   NEXT_PUBLIC_ENV="test" \
   API_URL="http://localhost:8000" \
   pnpm build
+EXIT=$?
+
+# trap restore_env runs here on EXIT
+exit $EXIT

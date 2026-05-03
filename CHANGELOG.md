@@ -6,6 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-05-03
+
+### Added
+
+- Phase 4 — `next-intl@4.11` + `libphonenumber-js@1.12` + `date-fns@4.1` installed.
+- Phase 4 — Locale-prefixed routing per D1: `/`, `/ru/...`, `/ky/...`, `/en/...`. The next-intl middleware redirects `/` → `/<negotiated-locale>` (Accept-Language → URL prefix → cookie persistence). All rendered pages live under `app/[locale]/` — there is no `app/layout.tsx`; `app/[locale]/layout.tsx` provides `<html lang>` + `<body>` + `next/font` + `NextIntlClientProvider` + `<TooltipPrimitive.Provider>`. Route handlers (`/api/health`, `/api/diag`) stay layout-free per Next.js convention.
+- Phase 4 — `i18n/config.ts` (locales tuple + defaultLocale + Locale type) and `i18n/request.ts` (`getRequestConfig` with `hasLocale` guard + dynamic message-file import).
+- Phase 4 — `middleware.ts` configured with `localePrefix: "always"` + `localeDetection: true`. Matcher excludes `/api`, `/_next`, static files, favicon. Phase 5 will compose auth-gate logic on top.
+- Phase 4 — `next.config.ts` wraps with `createNextIntlPlugin('./i18n/request.ts')`.
+- Phase 4 — `messages/{ru,ky,en}.json`: 50 keys per locale with **dotted-flat shape mirroring the backend's `app/i18n/<lang>.json` exactly** (per D2 + the user's Phase 4 reminder: backend keys are dotted, not nested objects). Mirrored 43 keys verbatim from backend (sms.\* family excluded — server-only); added 4 FE-only keys (`brand.{name,about,tagline}` + `ui.locale.{ru,ky,en,switch_to}`). Backend error code `code` field passes straight through to `t(\`error.\${code}\`)` with zero translation drift.
+- Phase 4 — `lib/format/{price,date,number,phone}.ts` locale-aware formatters: `formatPrice` (ru/ky → "1 250 сом" with thin-space U+2009 thousands + comma decimal + lowercase сом suffix; en → "1,250 KGS"), `formatDate` (DD.MM.YYYY for ru/ky, DD/MM/YYYY for en), `formatNumber` (locale-aware Intl wrap), `formatPhoneE164` / `formatPhoneDisplay` / `isValidPhone` (libphonenumber-js with `KG` default region matching the backend's `phonenumbers` config).
+- Phase 4 — `components/product/PriceTag.tsx` refactored to call `formatPrice` from `lib/format/price.ts` instead of its own inline `Intl.NumberFormat` (Phase 2 had the inline placeholder per its plan).
+- Phase 4 — `components/i18n/LangSwitcher.tsx`: compact pill switcher (RU/KY/EN). `aria-current="true"` on active option; manual path swap via `pathname.replace(/^\/[a-z]{2}/, ...)` so the URL prefix moves while the rest of the path is preserved; clicking the active locale is a no-op.
+- Phase 4 — `scripts/i18n-check.mjs` + `pnpm i18n:check` script + new CI `i18n-check` job. Asserts every key exists in all three locale files; exits non-zero on drift with a readable list of missing keys.
+- Phase 4 — `tests/unit/formatters.test.ts` (~25 cases: price/date/number/phone variants for all three locales + edge cases).
+- Phase 4 — `tests/component/lang-switcher.test.tsx` (6 cases: 3-pill rendering, aria-current/disabled on active, path-swap behaviour with nested paths, no-op on active click, bare /ru → /en swap).
+- Phase 4 — `tests/e2e/homepage.spec.ts` extended: `/` redirects to a locale-prefixed URL (locale-agnostic to handle browser Accept-Language variation), `/ru` direct navigation pins subsequent `/` visits to /ru via cookie, `/ky` and `/en` direct entries assert correct `<html lang>`.
+- Phase 4 — `tests/e2e/kitchen-sink-visual.spec.ts` updated to the new `/ru/kitchen-sink` URL after route restructure.
+
+### Changed
+
+- Phase 4 — Routes restructured under `[locale]`: `app/page.tsx` → `app/[locale]/page.tsx`; `app/(dev)/kitchen-sink/*` → `app/[locale]/(dev)/kitchen-sink/*`; deleted `app/layout.tsx` (`[locale]/layout.tsx` is the de-facto root for all rendered routes). R-A from the Phase 4 plan was preempted: Next 16 accepts the no-root-layout pattern.
+- Phase 4 — ESLint flat config gained a `scripts/**/*.{js,mjs,cjs}` block with Node globals so `console` and `process` resolve in `i18n-check.mjs` without polluting the React/JSX rule set.
+
+### Notes
+
+- **Backend i18n parity.** Verified at phase close: every key in `pharmacy_backend/app/i18n/{ru,ky,en}.json` outside the `sms.*` server-only family appears in our `messages/<lang>.json` with the same dotted-flat key name and identical RU/KY/EN values. When the backend emits a ProblemDetails `code` field, `t(\`error.\${code}\`)` resolves correctly across all three locales.
+- **`middleware.ts` deprecation.** Next 16 prints `The "middleware" file convention is deprecated. Please use "proxy" instead.` Logged as `RISKS.md R-13`. next-intl 4.11 still ships `next-intl/middleware`; we keep the current shape until next-intl publishes a `proxy.ts` migration path.
+- **Q-9 KY/EN seed.** All three locales fully populated. Backend-mirrored keys are human-curated (PRODUCT §21.2). `ui.*` and `brand.*` FE-only keys seeded for KY/EN; flagged for the existing pre-launch backlog item (KY pharmacist review + EN human review).
+- **R-A preempted.** Spec layout shape (`<html>+<body>` in `[locale]/layout.tsx`, no `app/layout.tsx`) compiles and serves correctly under Next 16; no fallback needed.
+- **R-B preempted.** date-fns has no `ky` locale; KY uses RU's `DD.MM.YYYY` per DESIGN §18.2 — visible difference is zero.
+
 ## [0.3.0] - 2026-05-03
 
 ### Added
