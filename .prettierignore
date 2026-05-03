@@ -20,3 +20,8 @@ MASTER_PLAN.md
 BUILD_PROGRESS.md
 DECISION_LOG.md
 OPEN_QUESTIONS.md
+
+# Auto-generated from the backend's OpenAPI spec.
+# Do not reformat (would create churn on every regeneration).
+generated/
+openapi.json

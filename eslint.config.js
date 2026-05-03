@@ -46,6 +46,19 @@ export default tseslint.config(
       "react/prop-types": "off",
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/consistent-type-imports": "error",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          // Honor the underscore-prefix convention: typed throwaway args
+          // (e.g. `_input: RequestInfo | URL` in test mocks that need to
+          // satisfy `typeof fetch`) and intentionally-unused destructured
+          // values.
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+          destructuredArrayIgnorePattern: "^_",
+        },
+      ],
       "react/jsx-no-target-blank": "error",
       "jsx-a11y/anchor-is-valid": "error",
     },

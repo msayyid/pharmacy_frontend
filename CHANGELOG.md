@@ -6,6 +6,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-03
+
+### Added
+
+- Phase 3 — Typed API client pipeline: `openapi-typescript@7.13` + `openapi-fetch@0.17` + `zod@4.4` + `zustand@5.0`.
+- Phase 3 — `generated/api.d.ts` (6,455 lines) auto-generated from the backend's OpenAPI schema. Compiles cleanly under `exactOptionalPropertyTypes: true` on first generation — R-A risk preempted, no patches needed.
+- Phase 3 — `openapi.json` snapshot at the repo root (144,696 bytes, captured against `pharmacy_backend@v1.0.0-rc1` running locally). CI regenerates types from the snapshot and diffs against the tracked `generated/api.d.ts`. Backend version bumps land via `feat(api): regenerate types from backend@<sha>` commits that update both files together.
+- Phase 3 — `lib/api/types.ts` re-exports 26 friendly aliases over the deeply nested `components["schemas"]["..."]` paths: `ProductDetail`, `ProductCard`, `ProductsPage`, `CategoryNode`, `CategoryDetail`, `Symptom`, `Branch`, `SearchResults`, `SuggestResponse`, `CartRead`, `CartItemRead`, `CartTotalsRead`, `CheckoutQuote`, `PlaceOrderRequest`, `PlaceOrderResponse`, `OrderRead`, `OrderListItem`, `OrderStatusRead`, `ReorderResponse`, `UserMe`, `UserMeUpdate`, `Address`, `AddressCreate`, `AddressUpdate`, `TokenPair`, `OtpRequestOut`. Components consume these aliases — never the deep paths.
+- Phase 3 — `lib/api/errors.ts`: `ApiError` class + `parseApiError(response)` parser. Preserves the 70+ ProblemDetails codes from `MASTER_PLAN §2.6` opaquely (no TypeScript union, no message map — Phase 4 maps to i18n keys). Captures the `X-Request-ID` echo header for trace correlation. Resilient to malformed JSON, empty bodies, and non-ProblemDetails responses (falls back to `unknown_error` + HTTP status).
+- Phase 3 — `lib/api/server.ts`: `createServerApiClient()` factory for RSC + route handlers + Server Actions. Reads `Accept-Language` from `next/headers`, stamps a `crypto.randomUUID()` `X-Request-ID`, throws `ApiError` on non-2xx so consumers get a single error path.
+- Phase 3 — `lib/api/client.ts`: `createBrowserApiClient(opts?)` factory + default `apiClient` singleton. `credentials: "include"` so guest cart cookie + admin session cookie flow. Authorization Bearer attached when `useAuthStore.getState().accessToken` is set, EXCEPT on `/api/v1/auth/*` paths (pathname-based check, not substring). 401 → `refreshAccessToken()` → retry once or fall through to throwing `ApiError`. Factory accepts a custom `fetch` for tests.
+- Phase 3 — `lib/auth/store.ts` (Zustand) and `lib/auth/refresh.ts` ship as Phase-5 stubs (accessToken: null; refresh returns null) with explicit `// TODO: Phase 5 — single-flight refresh against /api/auth/refresh-tokens` comments. The interceptor wiring is in place; Phase 5 swaps the function bodies, not the call sites.
+- Phase 3 — `lib/env/server.ts` (with `import "server-only"`) and `lib/env/client.ts` parse `process.env` via Zod schemas at module load. Server schema: `API_URL`, `SENTRY_DSN`, `NODE_ENV`. Client schema: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_DEFAULT_LOCALE`, `NEXT_PUBLIC_ENV`, `NEXT_PUBLIC_SENTRY_DSN`. Crashes on import if a required field is missing rather than failing silently downstream.
+- Phase 3 — `app/api/diag/route.ts`: dev/staging-only diagnostic that calls the server fetcher's `GET /health` and returns `{ ok, backend, requestId }` on success or `{ ok: false, error }` with 502 on failure. Production builds 404 via `notFound()` env gate.
+- Phase 3 — `tests/unit/api-errors.test.ts` (12 cases): every ProblemDetails variant, malformed JSON, empty body, 422 with `errors: [...]`, X-Request-ID capture, 5xx fallback, 0-status edge case, opaque code preservation.
+- Phase 3 — `tests/component/api-client.test.ts` (7 cases): Authorization header attached/skipped per pathname, X-Request-ID UUID format, ApiError thrown on non-2xx, refresh-on-401 stub semantics (Phase 3 falls through; Phase 5 retries with the new token).
+- Phase 3 — CI gate: new `types-check` job regenerates `generated/api.d.ts` from `openapi.json` snapshot and fails on `git diff --exit-code` drift.
+- Phase 3 — `vitest.config.ts > test.env` injects `NEXT_PUBLIC_API_URL` + `API_URL` + `NODE_ENV` defaults so the Zod env schemas don't crash the test runner in CI (no `.env.local` available there).
+
+### Changed
+
+- Phase 3 — `lib/api/client.ts` exposes a `createBrowserApiClient(opts?)` factory in addition to the default `apiClient` singleton. The factory accepts a custom `fetch` for testability.
+- Phase 3 — `package.json` adds `types:generate`, `types:generate:snapshot`, and `types:check` scripts.
+
+### Notes
+
+- **R-A from the Phase 3 plan was preempted.** openapi-typescript v7.13 emits `field?: T` (not `field?: T | undefined`) which is `exactOptionalPropertyTypes: true`-safe. No flags, no tsconfig relaxation needed. If a future openapi-typescript version regresses this, we have headroom to upgrade or add `--immutable`/`--default-non-nullable` flags before relaxing strict mode.
+- **D7 (auth stubs ship now).** The Phase-5 TODO comments in `lib/auth/store.ts` and `lib/auth/refresh.ts` carry the full implementation contract: single-flight dedup of concurrent refresh attempts, route handler at `/api/auth/refresh-tokens`, redirect to `/auth/otp` on failure, never-loop-on-auth-endpoints rule.
+- **Diagnostic route smoke (verified at phase close):** `curl localhost:3000/api/diag` returned `{"ok":true,"backend":{"status":"ok","version":"0.1.0"},"requestId":"49de0325-1a59-4697-a0c4-ec29cdb3413f"}` against the running backend. Backend version 0.1.0 is the FastAPI app's `version` field (not the git tag); wire is end-to-end verified.
+
 ## [0.2.0] - 2026-05-03
 
 ### Added

@@ -72,3 +72,46 @@
 **Reversibility.** Hard. Once primitives are wired into Phases 5-10 against Radix API shapes, switching to Base UI would require touching most components. Plan to revisit only if the Radix umbrella package goes unmaintained.
 
 **References.** `FRONTEND_BLUEPRINT §2.1`; `DESIGN_BLUEPRINT §11.1`; user message authorizing Path A on 2026-05-03; `BUILD_PROGRESS.md > Phase 2`.
+
+---
+
+### 2026-05-03 — Phase 3: API client + type generation
+**Phase:** 3
+**Context.** Stand up a typed, error-aware HTTP client wired to the backend's OpenAPI spec, with auth-aware variants for RSC and client. CI must fail on type drift. ApiError carries the 70+ ProblemDetails codes opaquely (no enumeration); Phase 4 maps them to i18n keys.
+
+**Decisions.**
+
+- **D1 — Code-gen tools.** `openapi-typescript@7.13` (types) + `openapi-fetch@0.17` (runtime). v7 of openapi-typescript proved exactOptionalPropertyTypes-clean on first generation — no patches needed. R-A from the plan was preempted.
+
+- **D2/D3 — CI types-check via openapi.json snapshot.** Backend isn't reachable from GitHub Actions runners. Strategy: commit `openapi.json` at repo root + `generated/api.d.ts`. CI runs `pnpm types:generate:snapshot` (regenerates from the local snapshot, not a live URL) and `git diff --exit-code generated/api.d.ts`. Backend version bumps land via an explicit `feat(api): regenerate types from backend@<sha>` commit that updates BOTH files together. Rejected: spinning up a backend service container in CI (operational complexity for marginal benefit; deterministic snapshot is preferable).
+
+- **D4 — No pre-commit types check.** `lint-staged` stays as-is (eslint --fix + prettier --write only). Regenerating types is too slow for pre-commit. CI catches drift before merge.
+
+- **D5 — `ApiError` shape.** `class ApiError extends Error` with `code: string`, `status: number`, `context: Record<string, unknown>`, `requestId?: string`, `errors?: ProblemDetailsError[]`. Constructor takes a single options object so call sites name fields explicitly. **`code` stays a plain string — we do NOT enumerate the 70+ codes catalogued in MASTER_PLAN §2.6 as a TypeScript union.** Phase 4 maps `error.${code}` → translated strings via i18n; Phase 3's job is just opaque preservation.
+
+- **D6 — Two fetcher factories on one error path.** `lib/api/server.ts` exports `createServerApiClient()` (RSC, `import "server-only"`, reads `Accept-Language` from `next/headers`); `lib/api/client.ts` exports `createBrowserApiClient(opts?)` factory + a default `apiClient` singleton. Both use the same `parseApiError`-throwing middleware. Server fetcher does not attach auth in Phase 3; client fetcher reads from `useAuthStore.getState().accessToken`.
+
+- **D7 — Auth stubs ship in Phase 3.** `lib/auth/store.ts` (Zustand) and `lib/auth/refresh.ts` (returns `null`) ship now with explicit `// TODO: Phase 5 — single-flight refresh against /api/auth/refresh-tokens` comments. The 401 interceptor calls `refreshAccessToken()` and falls through to throwing `ApiError` when null. Phase 5 swaps the function bodies; call sites stay untouched.
+
+- **D8 — Sentry breadcrumbs deferred to Phase 11.** The fetcher middleware shape is ready, but Sentry calls aren't added yet. Adding `Sentry.addBreadcrumb` calls now would be safe (no-op without DSN) but pollutes the file. Phase 11 hardening adds breadcrumbs alongside the real DSN wiring.
+
+- **D9 — `crypto.randomUUID()` per-request `X-Request-ID`.** Stamped in both fetcher middlewares' `onRequest`. Backend's `RequestIdMiddleware` echoes it in the response headers; `parseApiError` captures the echo for trace correlation on failures. Verified end-to-end via the diagnostic route.
+
+- **D10 — Auth-endpoint guard via pathname, not substring.** `new URL(request.url).pathname.startsWith("/api/v1/auth/")` instead of the spec's `request.url.includes("/auth/")`. The substring check would also match a hypothetical `/me/auth/*` and create false negatives. Pathname-based is unambiguous.
+
+- **D11 — Two env modules with Zod.** `lib/env/server.ts` (with `import "server-only"`) parses `API_URL`, `SENTRY_DSN`, `NODE_ENV`. `lib/env/client.ts` parses `NEXT_PUBLIC_*`. Both throw on import if a required field is missing. Test runner gets defaults via `vitest.config.ts > test.env`.
+
+- **D12 — Diagnostic route at `/api/diag` (no underscore).** Next.js App Router treats `app/_folder` as a private folder (not routed); using `_diag` would have made the route unreachable. Path is `app/api/diag/route.ts`. Production is gated via `notFound()` when `NEXT_PUBLIC_ENV === "production"` — same env-gate pattern as the kitchen sink.
+
+- **D13 — No MSW.** Tests inject a custom `fetch` via openapi-fetch's `fetch` option (the new `BrowserApiClientOptions.fetch` field on `createBrowserApiClient`). Simpler than MSW for these middleware tests; one fewer dep to maintain.
+
+- **D14 — Caching defaults only.** `createServerApiClient` does NOT set Next.js `revalidate` or `cache:` options. Per-surface caching (categories 5m, products 5m, search 30s, cart no-cache) is set at consumer call sites in Phases 6-10.
+
+**Side findings.**
+- Vitest doesn't load `.env.local` automatically. Without `vitest.config.ts > test.env` defaults, `lib/env/client.ts` Zod parse crashed all tests in this phase. The fix injects `NEXT_PUBLIC_*` + `API_URL` + `NODE_ENV` defaults at the runner level. CI inherits the same defaults; no `.env.local` needed in CI either.
+- openapi-fetch's `fetch` option is typed `(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>`. Test mocks must widen their parameter types accordingly (using `_input: RequestInfo | URL` rather than `_request: Request`) to satisfy the typecheck.
+- The `client.GET("/health" as never)` cast in the diagnostic route is needed because openapi-fetch's path inference treats `/health` as outside the `/api/v1` namespace; the cast bypasses the string-literal check. Acceptable for an env-gated dev route.
+
+**Reversibility.** Easy. The fetcher factories are pure functions; the auth stubs are 5-line files. Replacing the snapshot strategy with a service container is a CI-only change.
+
+**References.** `FRONTEND_BLUEPRINT §6, §7, §14, §15, §19`; `FRONTEND_CLAUDE_CODE_PROMPTS §Phase 3`; backend `app/api/errors.py` for ProblemDetails contract; `app/main.py` for middleware order (RequestId outermost, echoes header); `app/core/config.py` for env names. Phase 3 plan in chat 2026-05-03.

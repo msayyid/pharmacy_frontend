@@ -6,11 +6,11 @@
 
 ## Current state
 
-- **Active phase:** Phase 3 — API Client + Type Generation _(awaiting plan)_
-- **Status:** Phase 2 complete; Phase 3 plan due before any Phase 3 code.
+- **Active phase:** Phase 4 — i18n Foundation _(awaiting plan)_
+- **Status:** Phase 3 complete; Phase 4 plan due before any Phase 4 code.
 - **Last session:** 2026-05-03
-- **Sub-phases done:** Phase 0 (master plan); Phase 1A-1F (Next.js 16 foundation); Phase 2A-2F (brand tokens + 4 logo SVGs + shadcn pinned to Radix + Button/Badge/Card customizations + 5 composed-component skeletons + kitchen-sink dev page + 23 component/E2E tests). All Phase 2 verification gates green; v0.2.0 tagged.
-- **Next session should:** read `FRONTEND_CLAUDE_CODE_PROMPTS.md §Phase 3`, re-read `FRONTEND_BLUEPRINT §6 (backend API integration)`, `§7 (type generation)`, `§14 (error handling)`, `§15 (caching)`, `§19 (observability)`, fetch backend `app/main.py`, `app/core/errors.py`, `app/api/errors.py`, `app/core/config.py`, and `${API_URL}/openapi.json`. Then post a Phase 3 plan covering the `openapi-typescript` + `openapi-fetch` pipeline, `ApiError` parsing, RSC vs client fetcher variants, request-ID propagation, and the `pnpm types:check` CI gate. No code until plan is approved.
+- **Sub-phases done:** Phase 0 (master plan); Phase 1A-1F (Next.js 16 foundation); Phase 2A-2F (brand tokens + 4 logo SVGs + shadcn pinned to Radix + Button/Badge/Card customizations + 5 composed-component skeletons + kitchen-sink dev page); Phase 3A-3F (Zod env schemas + openapi-typescript@7.13 generation + openapi.json snapshot + ApiError class + RSC + client fetcher factories + auth stubs with Phase 5 TODOs + diagnostic route + CI types-check gate + 19 new tests). All Phase 3 gates green; v0.3.0 tagged. **Diagnostic smoke verified end-to-end:** `curl /api/diag` returns real backend health + echoed X-Request-ID.
+- **Next session should:** read `FRONTEND_CLAUDE_CODE_PROMPTS.md §Phase 4`, re-read `DESIGN_BLUEPRINT §17 (voice/tone)`, `§18 (localization)`, `FRONTEND_BLUEPRINT §13 (i18n)`, `PRODUCT_BLUEPRINT §16 (i18n strategy)`, `§21 (critical i18n keys)`. Fetch backend `app/i18n/{ru,ky,en}.json` + `app/core/i18n.py`. Then post a Phase 4 plan covering `next-intl` setup with `[locale]` URL prefix, `messages/*.json` mirrored from backend (~49 keys) + the FE-only namespaces (`nav`, `cta`, `header`, `footer`, etc. — see `MASTER_PLAN §4.2`), locale-aware formatters in `lib/format/{price,date,number,phone}.ts`, and `pnpm i18n:check` script. No code until plan is approved.
 
 ---
 
@@ -19,7 +19,8 @@
 - [x] Phase 0 — Spec Comprehension & Master Plan _(done 2026-05-03)_
 - [x] Phase 1 — Project Foundation _(done 2026-05-03; v0.1.0)_
 - [x] Phase 2 — Design System Implementation _(done 2026-05-03; v0.2.0)_
-- [ ] Phase 3 — API Client + Type Generation _(active — plan pending)_
+- [x] Phase 3 — API Client + Type Generation _(done 2026-05-03; v0.3.0)_
+- [ ] Phase 4 — i18n Foundation _(active — plan pending)_
 - [ ] Phase 4 — i18n Foundation
 - [ ] Phase 5 — Auth & Account
 - [ ] Phase 6 — Catalog Browse (read-only)
