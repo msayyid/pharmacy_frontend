@@ -1,10 +1,10 @@
 import type { Metadata } from "next"
 import { DM_Serif_Display, Inter, JetBrains_Mono } from "next/font/google"
-import { hasLocale, NextIntlClientProvider } from "next-intl"
+import { hasLocale } from "next-intl"
 import { getMessages } from "next-intl/server"
 import { notFound } from "next/navigation"
-import { Tooltip as TooltipPrimitive } from "radix-ui"
 
+import { AppProviders } from "@/app/providers"
 import { BRAND } from "@/lib/brand"
 import { locales } from "@/i18n/config"
 import "../globals.css"
@@ -43,11 +43,10 @@ interface LocaleLayoutProps {
 // `<body>` directly. All rendered routes live under `[locale]`. Route
 // handlers (`/api/*`) are layout-free by Next.js convention.
 //
-// If Next 16 ever rejects this shape (requires `app/layout.tsx` to exist
-// with `<html>+<body>`), the fallback is documented in the Phase 4 plan
-// (R-A): keep `app/layout.tsx` with fixed `lang="ru"` and add a small
-// client-side useEffect to update `document.documentElement.lang` on
-// locale switch.
+// Phase 5 (D10): wraps children with <AppProviders> so client components
+// have access to TanStack Query, next-intl, and Radix Tooltip context.
+// The provider lives in app/providers.tsx ("use client") and is mounted
+// here from this Server Component.
 export default async function LocaleLayout({ children, params }: LocaleLayoutProps) {
   const { locale } = await params
   if (!hasLocale(locales, locale)) notFound()
@@ -60,9 +59,9 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
       className={`${inter.variable} ${jetbrainsMono.variable} ${dmSerif.variable}`}
     >
       <body>
-        <NextIntlClientProvider messages={messages}>
-          <TooltipPrimitive.Provider>{children}</TooltipPrimitive.Provider>
-        </NextIntlClientProvider>
+        <AppProviders locale={locale} messages={messages}>
+          {children}
+        </AppProviders>
       </body>
     </html>
   )

@@ -8,18 +8,27 @@ import type { UserMe } from "@/lib/api/types"
 // reads (`useAuthStore.getState().accessToken`) work everywhere — the API
 // client uses this pattern in `lib/api/client.ts`.
 //
-// TODO: Phase 5 — wire OTP-verify + refresh-tokens flow:
-//   1. Hydrate `accessToken` + `currentUser` on mount via the
-//      `/api/auth/refresh-tokens` route handler that reads the HttpOnly
-//      `nookat_refresh` cookie and rotates the pair.
-//   2. Persist nothing here (refresh stays in HttpOnly cookie; access token
-//      lives in memory only — see CLAUDE.md sacred invariant 7).
-//   3. On logout: call `clear()` plus `/api/auth/clear-tokens` to drop the
-//      HttpOnly cookie at our origin.
+// Phase 5 fills in the OTP-verify + refresh-tokens flow:
+//   1. OTP-verify success → POST /api/auth/set-tokens (HttpOnly cookie at
+//      our origin) → useAuthStore.setTokens(accessToken, expiresIn).
+//   2. 401 → lib/auth/refresh.ts single-flight → setTokens again with the
+//      rotated pair.
+//   3. Logout → POST /api/auth/logout → clear().
 
 interface AuthState {
   accessToken: string | null
+  /** Unix milliseconds. null when not set via setTokens (e.g., the legacy
+   *  setAccessToken alias or an explicit clear). Phase 11 may use this for
+   *  pre-emptive refresh ~60s before expiry. */
+  tokenExpiresAt: number | null
   currentUser: UserMe | null
+
+  /** Canonical Phase-5 setter. Stores the access token in memory and records
+   *  its expiry for future pre-emptive-refresh logic. */
+  setTokens: (accessToken: string, expiresInSeconds: number) => void
+  /** Phase-3 alias kept for backward compatibility with existing call sites
+   *  (api-client tests, ad-hoc setters). Sets `tokenExpiresAt` to null since
+   *  we don't have an expiry. Prefer `setTokens` in new code. */
   setAccessToken: (token: string | null) => void
   setCurrentUser: (user: UserMe | null) => void
   clear: () => void
@@ -27,8 +36,15 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set) => ({
   accessToken: null,
+  tokenExpiresAt: null,
   currentUser: null,
-  setAccessToken: (token) => set({ accessToken: token }),
+
+  setTokens: (accessToken, expiresInSeconds) =>
+    set({
+      accessToken,
+      tokenExpiresAt: Date.now() + expiresInSeconds * 1000,
+    }),
+  setAccessToken: (token) => set({ accessToken: token, tokenExpiresAt: null }),
   setCurrentUser: (user) => set({ currentUser: user }),
-  clear: () => set({ accessToken: null, currentUser: null }),
+  clear: () => set({ accessToken: null, tokenExpiresAt: null, currentUser: null }),
 }))

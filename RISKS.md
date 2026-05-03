@@ -38,13 +38,13 @@
 **Impact.** OTP works in dev only (fake SMS, code in uvicorn log); card payment works against fake adapter only; image URLs depend on R2 host shape.
 **Mitigation.** FE ships COD-only at MVP (per Q-2 / OPEN_QUESTIONS.md). Card radio is feature-flagged off. Image `remotePatterns` finalize at Phase 12 once Q15 closes. Phase 12 launch gated on Q13 closing (real OTP), not Q14 (card is Phase 1.5 anyway).
 
-## R-5 — Cart-merge backend gap 🔴
+## R-5 — Cart-merge backend gap 🟡
 
 **Raised:** 2026-05-03 (Phase 0)
 **Description.** Backend's `POST /auth/otp/verify` does not invoke `merge_guest_into_user`. Without intervention, a guest with items in cart loses them on login.
 **Likelihood.** High (every guest→user transition).
 **Impact.** Medium — breaks J-01 conversion if not handled.
-**Mitigation.** FE workaround in Phase 5: sequential re-add of guest-cart items via `POST /cart/items` after OTP-verify success. Best-effort, loses price snapshots, preserves intent. Tracked separately in `OPEN_QUESTIONS.md OQ-16` for the proper backend endpoint. Telemetry on FE workaround failures will inform whether to escalate to backend post-MVP.
+**Mitigation.** FE workaround **shipped in Phase 5** (`lib/cart/merge.ts`): sequential re-add of guest-cart items via `POST /cart/items` after OTP-verify success. Best-effort, loses price snapshots, preserves intent. Phase 5D wired the empty-list call at OTP-verify success; Phase 8 swaps in the real guest cart. Tracked separately in `OPEN_QUESTIONS.md OQ-16` for the proper backend endpoint. Telemetry on FE workaround failures will inform whether to escalate to backend post-MVP. Status downgraded 🔴 → 🟡: workaround is in production; remaining risk is "Phase 8 wires the real cart correctly."
 
 ## R-6 — Refresh-token transport asymmetry 🟢
 
@@ -105,6 +105,19 @@
 1. **Add an E2E test that visits `/api/diag` and asserts a 200 with the expected JSON shape.** Catches the import-at-build crash that the existing tests miss.
 2. **Mark `/api/diag` `export const dynamic = "force-dynamic"` AND defer the env access.** The route already has `dynamic = "force-dynamic"` (Phase 3) but its imports still resolve at module-load. Refactor `createServerApiClient` to either lazy-load the env (move the Zod parse into a memoized getter) OR have the diagnostic route access env directly with a fallback message instead of throwing. The cleanest pattern: `try { return JSON.json({...real diagnostic...}) } catch (envError) { return JSON.json({ ok: false, error: "env_missing", ... }, { status: 503 }) }`.
    **Status.** Monitoring. Acceptable through Phase 10. Phase 11 hardening pass closes both legs.
+
+## R-14 — Multi-tab refresh-cookie rotation race 🟡
+
+**Raised:** 2026-05-03 (Phase 5)
+**Description.** Backend's `POST /auth/refresh` rotates the refresh token: each call invalidates the cookie's old value and returns a new one. If Tab A and Tab B both 401 simultaneously and race to refresh, the slower tab's refresh fails (the rotated token was already consumed by the faster tab's refresh) and that tab silently logs out — appearing to the user as "I opened two tabs and got logged out."
+**Likelihood.** Low at MVP scale (single-tab is the common case). Medium once the storefront has staff users who routinely open multiple tabs (Phase A1+).
+**Impact.** Low — the user can re-OTP. No data loss; the access token in the slower tab's memory is still valid for its remaining TTL anyway, so the silent logout only manifests on the next 401.
+**Mitigation.** Accepted, deferred to Phase 11 hardening. Two-part fix:
+
+1. **BroadcastChannel for cross-tab coordination.** First tab to start a refresh broadcasts; other tabs await the broadcast result instead of racing.
+2. **localStorage "refresh-in-progress" lock with TTL.** Survives the BroadcastChannel-not-supported fallback path.
+
+Documented in `DECISION_LOG.md` 2026-05-03 Phase 5 entry (D-bug section / side findings) so a future "I opened two tabs and got logged out" report doesn't read as a regression — it's expected MVP behavior.
 
 ## R-13 — Next 16 deprecated `middleware.ts` in favor of `proxy.ts` 🟡
 

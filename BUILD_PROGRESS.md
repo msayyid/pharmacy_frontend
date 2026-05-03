@@ -6,11 +6,11 @@
 
 ## Current state
 
-- **Active phase:** Phase 5 — Auth & Account _(awaiting plan)_
-- **Status:** Phase 4 complete; Phase 5 plan due before any Phase 5 code.
+- **Active phase:** Phase 6 — Catalog Browse _(awaiting plan)_
+- **Status:** Phase 5 complete; Phase 6 plan due before any Phase 6 code.
 - **Last session:** 2026-05-03
-- **Sub-phases done:** Phase 0 (master plan); Phase 1A-1F (Next.js 16 foundation); Phase 2A-2F (brand tokens + shadcn-Radix + composed-component skeletons + kitchen-sink); Phase 3A-3F (typed openapi-fetch client + ApiError + RSC/client fetchers + auth stubs + diagnostic route + CI types-check); fix(ci) post-Phase-3 (build-time env injection in CI workflow + `pnpm build:ci` script + CLAUDE.md amendments around the false-green local gate); Phase 4A-4F (next-intl@4.11 + locale-prefixed `[locale]/...` routing + middleware locale detection + 50-key `messages/{ru,ky,en}.json` with backend dotted-flat parity + locale-aware formatters in `lib/format/{price,date,number,phone}.ts` + LangSwitcher + i18n:check CI gate + 31 new tests). All Phase 4 gates green; v0.4.0 tagged. **i18n smoke:** `/` → `/<accept-language-locale>`, `/ru`/`/ky`/`/en` all 200, `<html lang="ky">` confirmed.
-- **Next session should:** read `FRONTEND_CLAUDE_CODE_PROMPTS.md §Phase 5`, re-read `FRONTEND_BLUEPRINT §8 (auth & sessions)`, `§9.1 (routing)`, `§12 (forms)`, `DESIGN_BLUEPRINT §13.3 (phone input)`, `§13.5 (OTP input)`, `§12.10 (account pages)`, `PRODUCT_BLUEPRINT §8.1 / §8.3` (auth + addresses). Fetch backend `app/api/v1/auth.py`, `app/api/v1/account.py`, `app/domain/identity/{schemas,dependencies}.py`, `app/core/security.py`. Then post a Phase 5 plan covering OTP request/verify flow, `/api/auth/{set-tokens,refresh-tokens,logout}` route handlers (refresh in HttpOnly cookie at our origin per Q-4), single-flight refresh fill-in (replacing the Phase 3 stub in `lib/auth/refresh.ts`), phone input with libphonenumber-js, OTP 6-box paste-aware input, `/me` + `/me/addresses` CRUD, soft/hard auth gates in middleware composed with the existing next-intl middleware, and the **cart-merge sequential re-add workaround** at OTP-verify success per `DECISION_LOG.md` 2026-05-03 entry (OQ-16). No code until plan is approved.
+- **Sub-phases done:** Phase 0 (master plan); Phase 1A-1F (Next.js 16 foundation); Phase 2A-2F (brand tokens + shadcn-Radix + composed-component skeletons + kitchen-sink); Phase 3A-3F (typed openapi-fetch client + ApiError + RSC/client fetchers + auth stubs + diagnostic route + CI types-check); fix(ci) post-Phase-3 (build-time env injection in CI workflow + `pnpm build:ci` script + CLAUDE.md amendments around the false-green local gate); Phase 4A-4F (next-intl@4.11 + locale-prefixed `[locale]/...` routing + middleware locale detection + 50-key `messages/{ru,ky,en}.json` with backend dotted-flat parity + locale-aware formatters in `lib/format/{price,date,number,phone}.ts` + LangSwitcher + i18n:check CI gate + 31 new tests); Phase 5A-5F (auth route handlers in `app/api/auth/*` + single-flight refresh + Zustand auth store + return-URL sanitizer + cart-merge sequential workaround + PhoneInput + OtpInput + `/[locale]/auth/otp` + `/[locale]/account` + `/[locale]/account/addresses` CRUD + middleware composing next-intl with auth gate + AppProviders + 123 unit/component tests + 14 e2e tests + i18n unflatten fix surfaced via the Playwright web-server log). All Phase 5 gates green; v0.5.0 tagged.
+- **Next session should:** read `FRONTEND_CLAUDE_CODE_PROMPTS.md §Phase 6`, re-read `FRONTEND_BLUEPRINT §6 (route map)`, `§9.2-§9.4 (catalog routes)`, `§13 (data fetching patterns)`, `DESIGN_BLUEPRINT §11.1-§11.5 (product card / category list / symptom tiles)`, `PRODUCT_BLUEPRINT §16 (catalog browse)`. Fetch backend `app/api/v1/catalog.py`, `app/api/v1/categories.py`, `app/api/v1/symptoms.py`, `app/api/v1/branches.py`. Then post a Phase 6 plan covering: home page (RSC; symptom tiles + featured categories + "near you" branch picker stub); category index `/[locale]/c`; category detail `/[locale]/c/[slug]`; symptom tile click-through to filtered category list; branch picker placeholder per Q-6 deferral; product card (Phase 2 skeleton); empty/error states. No code until plan is approved.
 
 ---
 
@@ -21,8 +21,8 @@
 - [x] Phase 2 — Design System Implementation _(done 2026-05-03; v0.2.0)_
 - [x] Phase 3 — API Client + Type Generation _(done 2026-05-03; v0.3.0)_
 - [x] Phase 4 — i18n Foundation _(done 2026-05-03; v0.4.0)_
-- [ ] Phase 5 — Auth & Account _(active — plan pending)_
-- [ ] Phase 6 — Catalog Browse (read-only)
+- [x] Phase 5 — Auth & Account _(done 2026-05-03; v0.5.0)_
+- [ ] Phase 6 — Catalog Browse (read-only) _(active — plan pending)_
 - [ ] Phase 7 — PDP & Search
 - [ ] Phase 8 — Cart
 - [ ] Phase 9 — Checkout & Order Placement
@@ -90,15 +90,32 @@ pnpm dev
 
 ### After Phase 5 — auth flow live (J-01 partial)
 
+> **Backend setup (run once before the smoke + before the @requires-backend e2e):**
+>
+> ```bash
+> cd ../pharmacy_backend
+> make docker-up                  # Postgres + Redis containers
+> make dev                        # uvicorn on :8000, logs to stdout
+> # In a second terminal, capture the log to a file the e2e helper can fish:
+> make dev 2>&1 | tee /tmp/backend.log
+> ```
+>
+> The e2e helper (`tests/e2e/auth-flow.spec.ts`) defaults to `BACKEND_LOG_PATH=/tmp/backend.log` and `BACKEND_OTP_CMD=tail -n 200 $BACKEND_LOG_PATH | grep -oE 'code["=:]+[0-9]{6}' | tail -n 1 | grep -oE '[0-9]{6}'`. Override either env var if your backend log shape differs. The `PHARMACY_BACKEND_SMS_PROVIDER=fake` default keeps OTP codes flowing to the log without actually hitting Nikita.
+
 ```bash
-# Backend on :8000 with PHARMACY_BACKEND_SMS_PROVIDER=fake (default)
+# Manual smoke (storefront on :3000, backend on :8000)
 pnpm dev
 # Browse /ru/auth/otp; enter +996 700 12 34 56
-# Find OTP code in backend uvicorn log: grep sms_enqueued
+# Find OTP code: tail -n 30 /tmp/backend.log | grep -E 'code[":= ]+[0-9]{6}'
 # Verify; redirected to /ru/account
-# Browse /ru/account/addresses; add address with real Bishkek shape
+# Browse /ru/account/addresses; add address with real Bishkek shape (мкр Асанбай 1/22, etc.)
 # Reload; access token gone from memory; silent refresh fires; still logged in
-# Logout; cookie cleared; redirected to /ru
+# Logout; cookie cleared; /ru/account redirects to /ru/auth/otp?return=%2Fru%2Faccount
+
+# Automated e2e (chromium; backend must be running):
+pnpm e2e --project chromium --grep @requires-backend
+# → tests/e2e/auth-flow.spec.ts: 2 passed
+# Receipts from this run go in the phase-close summary alongside unit/component/CI green output.
 ```
 
 ### After Phase 9 — full J-01 (first-time symptom shopper)

@@ -160,3 +160,57 @@
 **Reversibility.** Easy. Backend dotted-flat parity means a future migration to nested-object shape (if next-intl ever requires it) is a one-shot transform script.
 
 **References.** `DESIGN_BLUEPRINT §17, §18`; `FRONTEND_BLUEPRINT §13`; `PRODUCT_BLUEPRINT §16, §21`; `FRONTEND_CLAUDE_CODE_PROMPTS §Phase 4`; backend `app/i18n/{ru,ky,en}.json` and `app/core/i18n.py`. Phase 4 plan in chat 2026-05-03.
+
+---
+
+### 2026-05-03 — Phase 5: Auth & Account
+**Phase:** 5
+**Context.** Phase 5 is the largest feature phase yet — it stitches the OTP request/verify flow, the refresh-cookie route handlers, the single-flight refresh, the phone+OTP inputs, the OTP page state machine, the cart-merge workaround, the `/me` + `/me/addresses` CRUD, and the middleware composition with the existing next-intl middleware. Plan was approved with R-A, R-F, and R-E surfaced for special attention.
+
+**Decisions.**
+
+- **D1 — Tokens at our origin, refresh in HttpOnly cookie.** Backend returns `{access_token, refresh_token, expires_in}` from `POST /api/v1/auth/otp/verify`; FE never stores the refresh token in JS. The OTP page POSTs the pair to `/api/auth/set-tokens` (a Next route handler at our origin), which sets the `nookat_refresh` HttpOnly + Secure-in-prod + SameSite=Lax cookie (30-day max-age). The access token lives only in `useAuthStore` memory.
+
+- **D2 — Single-flight refresh in `lib/auth/refresh.ts`.** A module-level `inFlight: Promise<string | null> | null` dedupes concurrent 401s app-wide. On success → `setTokens(access, expiresIn)` and return the token; on failure → `clear()` and return null. The `inFlight` is reset in `finally`. `_resetInFlightForTesting` exported under a leading-underscore name to make test isolation explicit.
+
+- **D3 — Skip the "auth-hint" cookie.** No second cookie just to signal "I might be logged in." The HttpOnly refresh cookie itself is the only auth artifact at the edge. The middleware reads its presence to gate routes. RSCs that need auth state read it the same way (`cookies().has("nookat_refresh")`); pages that show different content for logged-in vs guest (e.g. account links in the header) hydrate from `useAuthStore` after first paint, accepting the brief flash. Confirmed by user.
+
+- **D4 — Hard gate in middleware.** Routes matching `/[locale]/{account,orders,me}/*` redirect to `/[locale]/auth/otp?return=<sanitized current path>` when `nookat_refresh` is absent. The middleware composes two functions in sequence: `intlMiddleware(req)` first (sets the `[locale]` URL segment + locale cookie), then the auth gate as a sync wrapper around the next-intl response. Sync because next-intl 4.11's `createMiddleware` returns `(req: NextRequest) => NextResponse` synchronously.
+
+- **D5 — Soft gate via Zustand for header chrome.** Components that need to show "Hi, Иван" vs "Войти" link read from `useAuthStore.currentUser`. Hydration races cause a brief guest-state flash on first paint; acceptable per DESIGN §13.5.
+
+- **D6 — `app/api/auth/{set-tokens,refresh-tokens,logout}` only.** No `/api/auth/me` proxy — `useQuery({ queryKey: ["me"], queryFn: () => apiClient.GET("/api/v1/me") })` on the account page reads the live backend through the typed client. The route handlers exist solely to manage the HttpOnly cookie (which JS can't touch) and to add the bearer to the refresh request.
+
+- **D7 — Phone input with libphonenumber-js (KG default).** `components/auth/PhoneInput.tsx` is RHF-friendly (forwardRef + controlled). Format-on-blur via `formatPhoneDisplay` from `lib/format/phone.ts`. `type=tel` + `inputMode=tel` + `autoComplete=tel`. Accepts `+996…`, `0…`, and bare digits per backend's parser.
+
+- **D8 — OTP input as 6 single-digit cells.** `components/auth/OtpInput.tsx`. Auto-advance on digit; backspace-on-empty jumps to previous; ArrowLeft/Right move focus; paste fills all six cells (extracts first 6 digits from any pasted content); `onComplete` fires once when the value crosses 6 digits and re-fires after the value drops below 6 then refills (so resend → re-verify works without a remount).
+
+- **D9 — OTP page as 2-state Client Component.** `app/[locale]/auth/otp/page.tsx`: `phase: "PHONE" | "CODE"`. Phone form → `POST /api/v1/auth/otp/request` → moves to CODE phase + starts a 60s resend cooldown. Code form → `POST /api/v1/auth/otp/verify` → on success POSTs tokens to `/api/auth/set-tokens`, fires `mergeGuestCartIntoUser({ guestItems: [], client })` (Phase 5D's empty-list call; Phase 8 plumbs the real guest cart), then `router.replace(sanitizedReturn)`.
+
+- **D10 — Providers wrapper (`app/providers.tsx`) wraps everything in `[locale]/layout.tsx`.** Single source of QueryClient + NextIntlClientProvider + TooltipPrimitive.Provider. Stable QueryClient identity via `useState` factory. Locale changes recreate the [locale] subtree (rare, cheap), recreating the QueryClient — acceptable cost vs lifting QueryClient above [locale] which would resurrect the `app/layout.tsx` we deliberately removed in Phase 4 D6.
+
+- **D11 — `/me` + `/me/addresses` as Client Components.** Avoids the awkward "RSC fetches with Authorization header" pattern (would require reading the cookie + calling backend `/auth/refresh` server-side just to render a profile page). Hard-gated by middleware so the page never renders for unauthenticated users. Both pages are `useQuery({queryKey: [...]})` with TanStack Query handling refresh-on-401 via the client fetcher's interceptor.
+
+- **D12 — Address form as Sheet on mobile + dialog on desktop.** Sheet works at all sizes per DESIGN §11.3; we just use Sheet everywhere for simplicity. Delete-confirm via Dialog (sacred invariant — no `confirm()` / `alert()`).
+
+- **D13 — Cart-merge wired now even though Phase 8 owns the cart.** `lib/cart/merge.ts` exists in Phase 5; the OTP-verify success handler calls `mergeGuestCartIntoUser({ guestItems: [], client })` with an empty list. When Phase 8 lands a real `useCart` hook, the call site swaps to read the guest items from there. Tests cover the per-item failure modes already.
+
+- **D14 — Open-redirect-hardened return-URL sanitizer (R-F).** `lib/auth/return-url.ts` rejects: empty/missing, non-string, backslash-containing, protocol-relative `//evil.com`, scheme-relative `https://evil.com`, `javascript:` / `data:`, and any URL whose `parsed.origin !== request.origin`. Falls back to `/[locale]/account`. Test vectors enumerated in `tests/unit/return-url.test.ts`.
+
+- **D-bug — i18n flat-key bug surfaced and fixed in 5F.** Phase 4 D2 picked dotted-flat JSON keys (`{"auth.otp.title": "..."}`) for backend parity. next-intl 4.x treats `.` in `t(key)` as a path separator and navigates `messages.auth.otp.title`, NOT `messages["auth.otp.title"]`. The homepage tests didn't exercise `t()` with dotted keys, so Phase 4 CI was a false-green for the i18n pipeline; the OTP page was the first place this surfaced, via Playwright web-server logs (`MISSING_MESSAGE: Could not resolve auth.otp.title in messages`). Fix: `i18n/unflatten.ts` converts the on-disk flat JSON to a nested object once per request inside `getRequestConfig`. The on-disk JSON shape stays flat (preserves backend parity); next-intl sees the shape it expects. Also set `timeZone: "Asia/Bishkek"` to silence the `ENVIRONMENT_FALLBACK` markup-mismatch warning.
+
+**Side findings.**
+
+- **R-A preempted (third time in a row).** next-intl 4.11 `createMiddleware` returns a synchronous `(req: NextRequest) => NextResponse`. Composing the auth gate as a sync wrapper around the next-intl response works cleanly — no Promise.then chain, no async coordination needed.
+
+- **R-E (refresh cookie rotation race in multi-tab) — accepted, deferred to Phase 11.** The backend's refresh endpoint rotates the refresh token: each `POST /auth/refresh` invalidates the cookie's old value and returns a new one. If Tab A and Tab B both 401 simultaneously, the slower tab's refresh attempt fails (the rotated token was already consumed by the faster tab's refresh) and that tab silently logs out. Mitigation deferred to Phase 11: BroadcastChannel for cross-tab coordination + a localStorage "refresh-in-progress" lock. Single-tab is the supported MVP scenario. **Documented here so a future "I opened two tabs and got logged out" report doesn't read as a regression** — it's expected behavior under MVP scope.
+
+- **`use client` files referencing `t()` rely on flat→nested unflatten.** Once the unflatten ran during the request, both server and client components see the same nested message tree (next-intl's NextIntlClientProvider receives the unflattened object via getMessages). No per-component changes were needed; the fix lands entirely in `i18n/request.ts`.
+
+- **The `account/profile-form.tsx` "Saved." vs "Сохранено." check** uses `t("auth.otp.sent").includes("Код")` to detect locale (RU vs EN) for a status string. Brittle but works under the unflatten fix because the resolved string is the localized one. A proper locale-aware status string lands when we add `account.profile.saved` keys post-MVP — flagged in the pre-launch backlog implicitly under "EN translations human-reviewed."
+
+- **vi.fn typing under exactOptionalPropertyTypes.** Test-side mocks for `(input, init?)` need explicit parameter types (`_input: RequestInfo | URL, _init?: RequestInit`) to satisfy `vi.fn`'s argtype inference; otherwise `mock.calls[0]` widens to `[]` and indexing fails typecheck. Documented now so future test files don't re-discover.
+
+**Reversibility.** Most decisions are easy: the route handlers, refresh flow, providers, and inputs are all swap-in-place. The middleware composition is moderate (touches the entry point of every request). The unflatten fix is trivially reversible if next-intl ever ships flat-key support — delete `i18n/unflatten.ts`, drop the conversion call in `i18n/request.ts`. The cart-merge workaround is the marquee item to delete when the backend lands `POST /api/v1/cart/merge` (OQ-16).
+
+**References.** `FRONTEND_BLUEPRINT §8 (auth & sessions)`, `§9.1 (routing)`, `§12 (forms)`; `DESIGN_BLUEPRINT §13.3 (phone input)`, `§13.5 (OTP input)`, `§12.10 (account pages)`; `PRODUCT_BLUEPRINT §8.1 / §8.3` (auth + addresses); `FRONTEND_CLAUDE_CODE_PROMPTS §Phase 5`; backend `app/api/v1/auth.py`, `app/api/v1/account.py`, `app/domain/identity/*`, `app/core/security.py`. Phase 5 plan in chat 2026-05-03.
