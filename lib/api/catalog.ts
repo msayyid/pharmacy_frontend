@@ -1,7 +1,17 @@
 import "server-only"
 
 import { createServerApiClient } from "./server"
-import type { Branch, CategoryDetail, CategoryNode, ProductsPage, Symptom } from "./types"
+import type {
+  Branch,
+  CategoryDetail,
+  CategoryNode,
+  ProductCard,
+  ProductDetail,
+  ProductsPage,
+  SearchResults,
+  SuggestResponse,
+  Symptom,
+} from "./types"
 
 // Server-only catalog fetchers used by Phase 6 RSC pages. Each helper sets
 // the per-surface `next.revalidate` window per FRONTEND_BLUEPRINT §15.2 so
@@ -20,7 +30,16 @@ const REVALIDATE = {
   symptomsList: 300,
   symptomProducts: 30,
   branches: 3600,
+  productDetail: 60,
+  productRelated: 60,
+  searchSuggest: 30,
 } as const
+
+export interface SearchParams {
+  q: string
+  page?: number
+  pageSize?: number
+}
 
 export interface CategoryProductsParams {
   slug: string
@@ -156,5 +175,94 @@ export async function getBranches(locale: string): Promise<Branch[]> {
     return ((response as { data?: Branch[] }).data ?? []) as Branch[]
   } catch {
     return []
+  }
+}
+
+// ─── Phase 7: PDP + search ─────────────────────────────────────────────────
+// Same catch-and-empty contract per CLAUDE.md Operating Principle 13:
+// read-only browse fetchers return null / empty defaults on failure so
+// pages render their EmptyState surface instead of error.tsx.
+
+export async function getProductDetail(
+  slug: string,
+  locale: string,
+): Promise<ProductDetail | null> {
+  try {
+    const client = createServerApiClient(locale)
+    const response = await client.GET("/api/v1/products/{slug}", {
+      params: { path: { slug } },
+      next: { revalidate: REVALIDATE.productDetail },
+    } as never)
+    return ((response as { data?: ProductDetail }).data ?? null) as ProductDetail | null
+  } catch {
+    return null
+  }
+}
+
+export async function getRelatedProducts(slug: string, locale: string): Promise<ProductCard[]> {
+  try {
+    const client = createServerApiClient(locale)
+    const response = await client.GET("/api/v1/products/{slug}/related", {
+      params: { path: { slug } },
+      next: { revalidate: REVALIDATE.productRelated },
+    } as never)
+    return ((response as { data?: ProductCard[] }).data ?? []) as ProductCard[]
+  } catch {
+    return []
+  }
+}
+
+const EMPTY_SEARCH_RESULTS = (page: number, pageSize: number): SearchResults => ({
+  items: [],
+  total: 0,
+  page,
+  page_size: pageSize,
+  synonyms_used: [],
+  popular_searches: [],
+})
+
+export async function getSearchResults(
+  locale: string,
+  { q, page = 1, pageSize = 24 }: SearchParams,
+): Promise<SearchResults> {
+  // Backend rejects q.length < 2 with a validation error; we short-circuit
+  // here so callers can pre-flight without a network round-trip. Pages
+  // calling this with q="x" still get a typed empty page they can render.
+  if (q.trim().length < 2) {
+    return EMPTY_SEARCH_RESULTS(page, pageSize)
+  }
+  try {
+    const client = createServerApiClient(locale)
+    const response = await client.GET("/api/v1/search", {
+      params: {
+        query: { q: q.trim(), page, page_size: pageSize },
+      },
+      // Search results are URL-driven and per-query; do not cache.
+      cache: "no-store",
+    } as never)
+    return ((response as { data?: SearchResults }).data ??
+      EMPTY_SEARCH_RESULTS(page, pageSize)) as SearchResults
+  } catch {
+    return EMPTY_SEARCH_RESULTS(page, pageSize)
+  }
+}
+
+const EMPTY_SUGGEST: SuggestResponse = {
+  products: [],
+  categories: [],
+  symptoms: [],
+}
+
+export async function getSuggestResults(locale: string, q: string): Promise<SuggestResponse> {
+  if (q.trim().length < 2) return EMPTY_SUGGEST
+  try {
+    const client = createServerApiClient(locale)
+    const response = await client.GET("/api/v1/search/suggest", {
+      params: { query: { q: q.trim() } },
+      next: { revalidate: REVALIDATE.searchSuggest },
+    } as never)
+    return ((response as { data?: SuggestResponse }).data ?? EMPTY_SUGGEST) as SuggestResponse
+  } catch {
+    return EMPTY_SUGGEST
   }
 }

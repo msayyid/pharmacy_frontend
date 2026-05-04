@@ -18,6 +18,12 @@ import { parseApiError } from "./errors"
 //   - Authorization: Bearer <token> attached when the auth store has a token,
 //     EXCEPT on /api/v1/auth/* endpoints (those don't need it; including it
 //     would create a refresh loop on /auth/refresh).
+//   - Accept-Language pinned per-call when a `locale` is provided, matching
+//     the URL-segment locale (Phase 6 D11 server-side pattern carried over to
+//     the client; Phase 7 R-E mitigation). Without an explicit locale, falls
+//     back to the browser's default Accept-Language — which is fine for
+//     locale-agnostic endpoints (auth, cart) but wrong for catalog/search
+//     where the URL segment is authoritative.
 //   - X-Request-ID stamped per call for trace correlation.
 //   - 401 → call refreshAccessToken() then retry once. The Phase-3 stub
 //     returns null, so 401s fall through to throwing ApiError. Phase 5 fills
@@ -28,7 +34,9 @@ import { parseApiError } from "./errors"
 //
 // Architecture: `createBrowserApiClient(opts)` is the factory; the module
 // exports a default singleton `apiClient` for production use, and tests use
-// the factory with a custom `fetch` to inject mock responses.
+// the factory with a custom `fetch` to inject mock responses. Locale-aware
+// callers (Phase 7 SearchInput/SearchSuggest) pass `{ locale }` to get a
+// client with Accept-Language pinned to the URL segment.
 
 const AUTH_ENDPOINT_PREFIX = "/api/v1/auth/"
 
@@ -45,10 +53,16 @@ function isAuthEndpoint(requestUrl: string): boolean {
 export interface BrowserApiClientOptions {
   baseUrl?: string
   fetch?: typeof fetch
+  /** URL-segment locale, e.g. "ru" / "ky" / "en". When set, every outbound
+   *  request gets `Accept-Language: <locale>` to override the browser's
+   *  default. Phase 7 R-E mitigation: client-side calls hitting the
+   *  storefront catalog (search, suggest) must reach the backend with the
+   *  URL locale, not whatever the browser says it prefers. */
+  locale?: string
 }
 
 export function createBrowserApiClient(opts: BrowserApiClientOptions = {}) {
-  const { baseUrl = clientEnv.NEXT_PUBLIC_API_URL, fetch: customFetch } = opts
+  const { baseUrl = clientEnv.NEXT_PUBLIC_API_URL, fetch: customFetch, locale } = opts
 
   const client = createClient<paths>({
     baseUrl,
@@ -62,6 +76,9 @@ export function createBrowserApiClient(opts: BrowserApiClientOptions = {}) {
       const token = useAuthStore.getState().accessToken
       if (token && !onAuth) {
         request.headers.set("Authorization", `Bearer ${token}`)
+      }
+      if (locale) {
+        request.headers.set("Accept-Language", locale)
       }
       request.headers.set("X-Request-ID", crypto.randomUUID())
       return request
@@ -88,3 +105,18 @@ export function createBrowserApiClient(opts: BrowserApiClientOptions = {}) {
 }
 
 export const apiClient = createBrowserApiClient()
+
+// Locale-aware factory cache. SearchInput / SearchSuggest call this once per
+// locale change; subsequent calls reuse the same client. Avoids re-installing
+// the middleware chain on every keystroke. Keys are 2-letter locale codes;
+// the cache is small (≤3 entries) and never invalidated — clients are pure
+// once constructed.
+const localeClients = new Map<string, ReturnType<typeof createBrowserApiClient>>()
+
+export function getApiClientForLocale(locale: string): ReturnType<typeof createBrowserApiClient> {
+  const cached = localeClients.get(locale)
+  if (cached) return cached
+  const client = createBrowserApiClient({ locale })
+  localeClients.set(locale, client)
+  return client
+}

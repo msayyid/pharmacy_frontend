@@ -525,7 +525,7 @@ pnpm pre-commit             # runs lint-staged
 8. **Never** suggest medicine for symptom in prescription tone.
 9. **Never** modify `/specs/*` files without explicit instruction.
 10. **Never** modify `generated/api.d.ts` by hand. Regenerate.
-11. **Never** use `dangerouslySetInnerHTML` without sanitization.
+11. **Never** use `dangerouslySetInnerHTML` for backend-returned text content. PDP descriptions, product names, category descriptions, search synonyms, error messages — all of these are plain text from a JSON API and React's default text-node escaping is the right XSS defense. The threat model is **malformed-API-bytes**: a bad row in the catalog DB, an injection through admin (Phase A1+ review territory), or a compromised backend response. Default `<p>{value}</p>` rendering closes that vector; `dangerouslySetInnerHTML` opens it. If a future surface genuinely needs rendered HTML (e.g., legal pages with formatted markup), sanitize via `DOMPurify` and document the choice in `DECISION_LOG.md`.
 12. **Never** weaken `tsc --strict`, ESLint, or test coverage to "ship the phase."
 13. **Never** ship a feature listed as Phase 1.5+ in PRODUCT §23 without explicit instruction.
 14. **Never** add a top-level dependency without logging in `DECISION_LOG.md`.
