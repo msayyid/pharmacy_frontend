@@ -264,6 +264,8 @@ pnpm e2e --config=playwright.smoke.ts --base-url=https://staging.nookat.kg
 - [ ] CORS origins on backend include production storefront + admin domains.
 - [ ] Sentry DSN configured (production project).
 - [ ] Backend Q13 (Nikita SMS) closed → real OTP works in production.
+- [ ] **OQ-17 verification (deferred from Phase 6)** — confirm `Accept-Language: ky` returns Kyrgyz product names from `GET /api/v1/symptoms/{slug}/products`. Not feasible at Phase 6 close because the seed has empty `symptoms=[]` arrays on every product, so the endpoint returns `{items: []}` for all locales (data-shaped empty, not language-shaped). Re-run once admin Phase A1+ has populated product-symptom links with realistic seeded data; if the response still comes back in Russian for `?lang=ky` / `Accept-Language: ky`, escalate as a real backend bug before launch.
+- [ ] **OQ-22 audit (deferred from Phase 6)** — backend audit of the `cache_get_or_set` race that caused `GET /api/v1/categories` to return `[]` despite 6 active rows during Phase 6 6B smoke. Self-resolved after a fresh dev start (likely an empty-array value cached for `CATEGORY_TREE_TTL=3600`); recommend confirming no recurrence + adding a "skip caching empty results" guard to the loader before launch. If the bug surfaces again in any later phase smoke, escalate.
 
 ---
 
