@@ -1,8 +1,7 @@
-import { PillIcon } from "lucide-react"
-import Image from "next/image"
 import { getTranslations } from "next-intl/server"
 
 import { PriceTag } from "@/components/product/PriceTag"
+import { ProductImage } from "@/components/product/ProductImage"
 import { StockPip } from "@/components/product/StockPip"
 import type { Locale } from "@/i18n/config"
 import type { ProductCard as ProductCardData } from "@/lib/api/types"
@@ -40,24 +39,7 @@ export async function ProductCard({ product, locale, className }: ProductCardPro
         className,
       )}
     >
-      <div
-        className={cn(
-          "relative aspect-square overflow-hidden rounded-md",
-          "bg-brand-50 flex items-center justify-center",
-        )}
-      >
-        {product.thumbnail_url ? (
-          <Image
-            src={product.thumbnail_url}
-            alt={product.name}
-            fill
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-            className="object-cover"
-          />
-        ) : (
-          <PillIcon aria-hidden="true" className="text-brand-300 size-12" />
-        )}
-      </div>
+      <ProductImage src={product.thumbnail_url} alt={product.name} />
 
       <div className="flex min-h-12 flex-col gap-1">
         <h3 className="text-body-sm text-ink-900 line-clamp-2 font-semibold">{product.name}</h3>
