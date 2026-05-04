@@ -6,11 +6,11 @@
 
 ## Current state
 
-- **Active phase:** Phase 7 — PDP & Search _(awaiting plan)_
-- **Status:** Phase 6 complete; Phase 7 plan due before any Phase 7 code.
+- **Active phase:** Phase 8 — Cart _(awaiting plan)_
+- **Status:** Phase 7 complete; Phase 8 plan due before any Phase 8 code.
 - **Last session:** 2026-05-04
-- **Sub-phases done:** Phase 0–5 (master plan / foundation / design system / typed API client / i18n / auth + account); Phase 6A–6F (catalog browse). Phase 6 ships the storefront chrome (Header / Footer / MobileMenu) + homepage RSC (Hero / symptom grid / featured categories / TrustStrip) + categories index + category detail with grid folded in (Q2) + symptoms index + symptom landing + about page + cart placeholder + URL-driven Pagination + SortSelect + ProductCard (default variant) + ProductImage wrapper. 41 new i18n keys (101 × 3). 16 backend asks logged as OQ-17–OQ-22 across two batches (Phase 6 plan-derived + smoke-derived). All Phase 6 gates green; v0.6.0 tagged.
-- **Next session should:** read `FRONTEND_CLAUDE_CODE_PROMPTS.md §Phase 7`, re-read `DESIGN_BLUEPRINT §12.6 (PDP)`, `§15 (trust signals)`, `§8.3 (product photography)`, `FRONTEND_BLUEPRINT §10 (data fetching)` + `§16 (image handling)`, `PRODUCT_BLUEPRINT §F-CAT-003 (PDP)` + `§F-CAT-008 (search)`. Fetch backend `app/api/v1/products.py`, `app/api/v1/search.py`, `app/domain/catalog/storefront_schemas.py` (StorefrontProductDetail, SearchResultPage, SuggestResponse), `app/domain/catalog/search.py`. Then post a Phase 7 plan covering: PDP at `/[locale]/products/[slug]` (RSC, generateMetadata, ImageCarousel, description tabs/accordion, ActiveIngredientChip row, SubstitutesBlock with Suspense), search at `/[locale]/search` (RSC + searchParams), SearchInput + SearchSuggest (client, debounced 250ms), search empty-state + synonym chip row. Phase 7 also retargets the homepage hero CTA from `/categories` → `/search` once the search route renders properly. No code until plan is approved.
+- **Sub-phases done:** Phase 0–6 + Phase 7A–7F (PDP + search). Phase 7 ships PDP at `/[locale]/products/[slug]` with ImageCarousel (Embla) + description tabs/accordion + ActiveIngredientChip row + DeliveryBadge + SubstitutesBlock (Suspense for in-stock, inline for OOS-promoted-above-fold per R-F); search at `/[locale]/search` with SearchSynonymChips + popular-searches empty-state; SearchInput + SearchSuggest in the header (debounced 250ms, locale-aware via `getApiClientForLocale`); R-E gate regression suite. 22 new i18n keys (123 × 3). embla-carousel-react + shadcn Accordion as new deps. CLAUDE.md grows OPs 12 + 13 (audit FE plumbing first; mutations must throw). All Phase 7 gates green; v0.7.0 tagged.
+- **Next session should:** read `FRONTEND_CLAUDE_CODE_PROMPTS.md §Phase 8`, re-read `FRONTEND_BLUEPRINT §11 (state management — cart store)` + `§14.4 (toast guidelines)`, `DESIGN_BLUEPRINT §12.7 (cart page)` + `§13.6 (quantity stepper)`, `PRODUCT_BLUEPRINT §F-CART-001..005` + `§7.1` (J-01 cart steps), and `CLAUDE.md > Domain reality checks > Cart cookie + Snapshot immutability`. Fetch backend `app/api/v1/cart.py`, `app/domain/orders/cart_service.py`, `app/domain/orders/schemas.py` (CartRead, CartItemRead, CartTotalsRead). Then post a Phase 8 plan covering: cart drawer (desktop) + dedicated `/cart` page (both); add-to-cart action wired to ProductCard + PDP CTA; quantity stepper; remove; price-changed UX; stock-conflict UX; optimistic mutation + rollback. **Critical reminder per CLAUDE.md OP-13: cart fetchers are mutation paths and MUST throw ApiError loudly — do NOT copy the Phase 6/7 catch-and-empty pattern there.** No code until plan is approved.
 
 ---
 
@@ -23,8 +23,8 @@
 - [x] Phase 4 — i18n Foundation _(done 2026-05-03; v0.4.0)_
 - [x] Phase 5 — Auth & Account _(done 2026-05-03; v0.5.0)_
 - [x] Phase 6 — Catalog Browse (read-only) _(done 2026-05-04; v0.6.0)_
-- [ ] Phase 7 — PDP & Search _(active — plan pending)_
-- [ ] Phase 8 — Cart
+- [x] Phase 7 — PDP & Search _(done 2026-05-04; v0.7.0)_
+- [ ] Phase 8 — Cart _(active — plan pending)_
 - [ ] Phase 9 — Checkout & Order Placement
 - [ ] Phase 10 — Order History & Detail
 - [ ] Phase 11 — Hardening: SEO, Perf, A11y
