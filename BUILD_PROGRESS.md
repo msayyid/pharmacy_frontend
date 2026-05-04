@@ -326,6 +326,19 @@ pnpm e2e --config=playwright.smoke.ts --base-url=https://staging.nookat.kg
 
 ### Pre-launch checklist (must close before production deploy)
 
+#### Backend blockers (must reconcile before any FE launch)
+
+- [ ] **OQ-24 — PDP `is_in_stock` asymmetry.** Backend's `GET /api/v1/products/{slug}` reads `is_in_stock=false` even when `GET /api/v1/categories/{slug}/products` reads the same product as in-stock for the same branch context. This is a conversion-killer: customer browses category → sees in-stock → clicks PDP → sees OOS → leaves. Different code paths in `app/domain/catalog/storefront.py`. **Phase 12 launch CANNOT ship until reconciled.** Once fixed, flip the regression marker in `tests/e2e/cart-flow.spec.ts` line 105 from `expect(cta).toBeDisabled()` to assert the happy path on PDP.
+- [ ] **Backend Q13 (Nikita SMS) closed** → real OTP works in production. Without this, the auth flow can't run against real customers (currently uses fake SMS adapter that logs codes to stdout).
+
+#### Backend asks (recommended audits before launch — not strict blockers)
+
+- [ ] **OQ-17 verification.** Confirm `Accept-Language: ky` returns Kyrgyz product names from `GET /api/v1/symptoms/{slug}/products`. Not feasible at Phase 6 close because the seed has empty `symptoms=[]` arrays on every product, so the endpoint returns `{items: []}` for all locales (data-shaped empty, not language-shaped). Re-run once admin Phase A1+ has populated product-symptom links with realistic seeded data; if the response still comes back in Russian for `?lang=ky` / `Accept-Language: ky`, escalate as a real backend bug before launch.
+- [ ] **OQ-22 audit.** Backend audit of the `cache_get_or_set` race that caused `GET /api/v1/categories` to return `[]` despite 6 active rows during Phase 6 6B smoke. Self-resolved after a fresh dev start (likely an empty-array value cached for `CATEGORY_TREE_TTL=3600`); recommend confirming no recurrence + adding a "skip caching empty results" guard to the loader before launch. If the bug surfaces again in any later phase smoke, escalate.
+- [ ] **OQ-23 — `requires_cold_chain` on `CartItemRead`.** Phase 8 deferred cold-chain banner to checkout (Phase 9). If Phase 9's checkout-side cold-chain flow becomes friction at smoke, escalate the backend ask. Otherwise post-MVP.
+
+#### FE pre-launch (content + ops + curation)
+
 - [ ] **KY translations reviewed by a local Kyrgyz pharmacist.** Coherent + complete is OK at MVP; polished is the pre-launch bar.
 - [ ] **EN translations human-reviewed.** Machine translation is acceptable as a starting point; production gate is human review.
 - [ ] **Real Nookat logo** swapped in (4-5 file edits per DESIGN §20). Owner provides before Phase 12.
@@ -335,9 +348,6 @@ pnpm e2e --config=playwright.smoke.ts --base-url=https://staging.nookat.kg
 - [ ] Legal pages (Terms / Privacy / Delivery / Returns) reviewed by counsel; placeholder text replaced.
 - [ ] CORS origins on backend include production storefront + admin domains.
 - [ ] Sentry DSN configured (production project).
-- [ ] Backend Q13 (Nikita SMS) closed → real OTP works in production.
-- [ ] **OQ-17 verification (deferred from Phase 6)** — confirm `Accept-Language: ky` returns Kyrgyz product names from `GET /api/v1/symptoms/{slug}/products`. Not feasible at Phase 6 close because the seed has empty `symptoms=[]` arrays on every product, so the endpoint returns `{items: []}` for all locales (data-shaped empty, not language-shaped). Re-run once admin Phase A1+ has populated product-symptom links with realistic seeded data; if the response still comes back in Russian for `?lang=ky` / `Accept-Language: ky`, escalate as a real backend bug before launch.
-- [ ] **OQ-22 audit (deferred from Phase 6)** — backend audit of the `cache_get_or_set` race that caused `GET /api/v1/categories` to return `[]` despite 6 active rows during Phase 6 6B smoke. Self-resolved after a fresh dev start (likely an empty-array value cached for `CATEGORY_TREE_TTL=3600`); recommend confirming no recurrence + adding a "skip caching empty results" guard to the loader before launch. If the bug surfaces again in any later phase smoke, escalate.
 
 ---
 

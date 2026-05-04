@@ -75,13 +75,13 @@ Backend fix: add the missing imports at the top of each seed module so `python -
 
 ### OQ-24 — PDP `is_in_stock` reads false even when catalog list reads the same product as in-stock
 **Raised:** 2026-05-04 (Phase 8 smoke)
-**Severity:** Medium — affects every PDP add-to-cart at MVP. Customer browses category, sees in-stock product, clicks → PDP renders disabled CTA. Confidence-destroying UX.
+**Severity:** **HIGH — launch blocker per Phase 12 pre-launch checklist.** Customer browses category → sees product in-stock → clicks PDP → sees OOS → leaves. Actively contradictory information across endpoints is worse than uniform-OOS — it's a conversion-killer that breaks customer trust on the highest-stakes page in the funnel.
 **Question.** With the Phase 8 smoke fixture applied (branches id=1 row + branch_products copy from id=3), `GET /api/v1/categories/pain-relief/products?in_stock_only=true` correctly returns 3 products with `is_in_stock=true` + real prices. But `GET /api/v1/products/par-500-20` for the same product returns `is_in_stock=false` + `price=0`. Cache flushed multiple times; same response. Backend has different `is_in_stock` computation paths for catalog list vs product detail.
 **Diagnostic.** Catalog list path goes through `get_category_with_products` which honors the FastAPI `BranchIdDep` (hardcoded to 1) AND uses the branch_products joined data. Product detail path goes through `get_product_detail` which has cache key `v1:product:read:{slug}:{language_code}` — no branch_id in cache, suggesting the service computes `is_in_stock` via a different signal (maybe a global product flag, maybe the storefront branch_products query path is missing in the detail service).
 **Phase 8 workaround.** AddToCartButton on the PDP stays disabled in the smoke. Cart-flow E2E adds-to-cart from the **category page** path, not PDP. Test `tests/e2e/cart-flow.spec.ts` line 105 explicitly asserts PDP CTA disabled as a regression marker — when backend reconciles, that test flips and we test add-from-PDP too.
-**Owner.** Backend team — recommend audit of `app/domain/catalog/storefront.py:get_product_detail` and the `hydrate_line_context` (or equivalent) path to understand why per-branch stock isn't applied to the detail endpoint.
-**Status.** Open — escalated to "audit before launch" because PDP add-to-cart is on every J-01 path.
-**Decision.** _(open — backend audit; FE waits without changes; cart-flow tests against the category-page path until reconciled)_
+**Owner.** Backend team — required audit of `app/domain/catalog/storefront.py:get_product_detail` and the `hydrate_line_context` (or equivalent) path to understand why per-branch stock isn't applied to the detail endpoint.
+**Status.** **Open — LAUNCH BLOCKER**. Listed under `BUILD_PROGRESS.md > Pre-launch checklist > Backend blockers`. Phase 12 cannot ship until this is reconciled.
+**Decision.** _(open — backend audit before launch; FE has the regression marker in `tests/e2e/cart-flow.spec.ts` line 105 that flips when backend fixes; cart-flow tests against the category-page path until then)_
 
 ### OQ-23 — Backend should expose `requires_cold_chain` on `CartItemRead` for cart-line cold-chain banner
 **Raised:** 2026-05-04 (Phase 8 plan R-G)
