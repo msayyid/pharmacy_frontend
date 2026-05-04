@@ -7,34 +7,46 @@ import type { Locale } from "@/i18n/config"
 import type { ProductCard as ProductCardData } from "@/lib/api/types"
 import { cn } from "@/lib/utils"
 
-// ProductCard — DESIGN §11.3 default variant. RSC.
+// ProductCard — DESIGN §11.3. RSC.
 // Square image (1:1) with brand-pill fallback when thumbnail_url is null
-// (DESIGN §8.4); name + dosage label; StockPip; PriceTag (compare-at
-// supported); disabled "Добавить в корзину" CTA per Phase 6 plan D5
-// (Phase 8 wires the click handler; D5 confirmed: no tooltip, disabled
-// state alone is universal e-commerce language).
+// (DESIGN §8.4); name; StockPip; PriceTag (compare-at supported); disabled
+// "Добавить в корзину" CTA per Phase 6 plan D5 (Phase 8 wires the click
+// handler; no tooltip, disabled state alone is universal e-commerce
+// language).
 //
-// Compact + wide variants land in Phase 6D / Phase 7 (search suggest)
-// / Phase 8 (cart line) — they share this component's shape with
-// different layout class sets.
+// Variants:
+//   - "default" (Phase 6) — full card with short_description, ingredient
+//     chips visible, full CTA. Used in category + symptom product grids.
+//   - "compact" (Phase 7) — same shape, no short_description, smaller
+//     padding. Used in SubstitutesBlock and (Phase 7E) SearchSuggest.
+//   - "wide" (Phase 8) — cart line shape; ships when cart lands.
 
 export interface ProductCardProps {
   product: ProductCardData
   locale: Locale
+  variant?: "default" | "compact"
   className?: string
 }
 
-export async function ProductCard({ product, locale, className }: ProductCardProps) {
+export async function ProductCard({
+  product,
+  locale,
+  variant = "default",
+  className,
+}: ProductCardProps) {
   const t = await getTranslations()
   const stockLabel = product.is_in_stock ? t("product.add_to_cart") : t("cart.out_of_stock")
   const ctaDisabled = !product.is_in_stock
+  const isCompact = variant === "compact"
 
   return (
     <article
       data-slot="product-card"
+      data-variant={variant}
       data-stock={product.is_in_stock ? "in-stock" : "out-of-stock"}
       className={cn(
-        "border-ink-100 bg-surface-card flex flex-col gap-3 rounded-lg border p-3",
+        "border-ink-100 bg-surface-card flex flex-col gap-3 rounded-lg border",
+        isCompact ? "p-2" : "p-3",
         "hover:border-brand-200 transition-colors",
         className,
       )}
@@ -43,7 +55,7 @@ export async function ProductCard({ product, locale, className }: ProductCardPro
 
       <div className="flex min-h-12 flex-col gap-1">
         <h3 className="text-body-sm text-ink-900 line-clamp-2 font-semibold">{product.name}</h3>
-        {product.short_description ? (
+        {!isCompact && product.short_description ? (
           <p className="text-caption text-ink-600 line-clamp-1">{product.short_description}</p>
         ) : null}
       </div>

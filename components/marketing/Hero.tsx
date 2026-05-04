@@ -27,8 +27,11 @@ export async function Hero({ locale }: HeroProps) {
         {t("home.hero.title")}
       </h1>
       <p className="text-body text-ink-700 md:text-body-lg max-w-2xl">{t("home.hero.subtitle")}</p>
+      {/* Phase 7 7C: retargeted from /categories → /search per Phase 6 plan
+       *  Q1 deferred decision (D1). Search route lands in 7D; the link
+       *  resolves to a working route by phase close. */}
       <Link
-        href={`/${locale}/categories`}
+        href={`/${locale}/search`}
         className={cn(
           "bg-brand-500 inline-flex items-center gap-2 rounded-md px-5 py-3",
           "text-body-sm font-medium text-white",

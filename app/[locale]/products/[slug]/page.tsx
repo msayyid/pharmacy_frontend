@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { getTranslations } from "next-intl/server"
 import { notFound } from "next/navigation"
 import { hasLocale } from "next-intl"
+import * as React from "react"
 
 import { ActiveIngredientChip } from "@/components/product/ActiveIngredientChip"
 import { DeliveryBadge } from "@/components/product/DeliveryBadge"
@@ -12,8 +13,13 @@ import {
 } from "@/components/product/ProductDescriptionTabs"
 import { PriceTag } from "@/components/product/PriceTag"
 import { StockPip } from "@/components/product/StockPip"
+import {
+  SubstitutesAsync,
+  SubstitutesBlock,
+  SubstitutesSkeleton,
+} from "@/components/product/SubstitutesBlock"
 import { type Locale, locales } from "@/i18n/config"
-import { getProductDetail } from "@/lib/api/catalog"
+import { getProductDetail, getRelatedProducts } from "@/lib/api/catalog"
 import type { ProductDetail } from "@/lib/api/types"
 import { BRAND, type BrandLocale } from "@/lib/brand"
 import { buildPageTitle } from "@/lib/seo/title"
@@ -89,6 +95,13 @@ export default async function PdpPage({ params }: PdpPageProps) {
 
   const product = await getProductDetail(slug, locale)
   if (!product) notFound()
+
+  // Plan R-F mitigation: in-stock PDPs stream the main content first and
+  // suspend the substitutes fetch below the description tabs. OOS PDPs
+  // promote alternatives above the fold (PRODUCT §F-CAT-007 + plan D6),
+  // so we fetch related upfront in the same render path — no Suspense,
+  // no layout shift after main content paints.
+  const oosRelated = !product.is_in_stock ? await getRelatedProducts(slug, locale) : null
 
   const sections: ProductDescriptionSection[] = SECTION_KEYS.flatMap((entry) => {
     const value = product[entry.field]
@@ -183,6 +196,17 @@ export default async function PdpPage({ params }: PdpPageProps) {
         </div>
       </section>
 
+      {/* OOS path: promote substitutes above the fold (right after the
+       *  disabled CTA section). Customer with active intent sees "here's
+       *  what works the same" before scrolling past. Plan D6 + R-F. */}
+      {oosRelated ? (
+        <SubstitutesBlock
+          products={oosRelated}
+          locale={locale as Locale}
+          heading={t("product.alternatives.heading_oos")}
+        />
+      ) : null}
+
       {sections.length > 0 ? (
         <section className="flex flex-col gap-3" aria-labelledby="pdp-details-heading">
           <h2 id="pdp-details-heading" className="text-h2 text-ink-900 font-semibold">
@@ -190,6 +214,19 @@ export default async function PdpPage({ params }: PdpPageProps) {
           </h2>
           <ProductDescriptionTabs sections={sections} />
         </section>
+      ) : null}
+
+      {/* In-stock path: substitutes stream below the description tabs via
+       *  Suspense, so the main PDP paints immediately and the related
+       *  fetch resolves in the background. */}
+      {product.is_in_stock ? (
+        <React.Suspense fallback={<SubstitutesSkeleton />}>
+          <SubstitutesAsync
+            slug={slug}
+            locale={locale as Locale}
+            heading={t("product.same_ingredient.heading")}
+          />
+        </React.Suspense>
       ) : null}
     </main>
   )
