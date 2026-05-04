@@ -49,6 +49,8 @@ export type SuggestResponse = components["schemas"]["SuggestResponse"]
 export type CartRead = components["schemas"]["CartRead"]
 export type CartItemRead = components["schemas"]["CartItemRead"]
 export type CartTotalsRead = components["schemas"]["CartTotalsRead"]
+export type CartItemAdd = components["schemas"]["CartItemAdd"]
+export type CartItemUpdate = components["schemas"]["CartItemUpdate"]
 
 // ---------------------------------------------------------------------------
 // Checkout + orders
