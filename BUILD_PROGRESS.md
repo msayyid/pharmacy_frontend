@@ -6,11 +6,11 @@
 
 ## Current state
 
-- **Active phase:** Phase 9 — Checkout & Order Placement _(awaiting plan)_
-- **Status:** Phase 8 complete; Phase 9 plan due before any Phase 9 code.
+- **Active phase:** Phase 10 — Order History & Detail _(next; not yet started)_
+- **Status:** Phase 9 complete and tagged v0.9.0. Phase 10 will build the customer-facing order history list at `/[locale]/orders` and the per-order detail page extension (the confirmation page from 9E becomes the seed; status timeline + cancel + reorder layer on top).
 - **Last session:** 2026-05-04
-- **Sub-phases done:** Phase 0–7 + Phase 8A–8E (cart). Phase 8 ships `lib/cart/{queries,mutations,store}.ts` (OP-13 throw-loudly contract verified at 8A grep gate); `QuantityStepper` (rapid-click collapse to one PATCH per debounce window per plan D4); `CartLine` (in-stock / OOS / price-changed variants + nullable handling); `CartTotals` (subtotal + discount + delivery/total when non-null); `CartDrawer` globally mounted; `CartIconWithBadge` (distinct-lines count); `AddToCartButton` shared CTA; ProductCard + PDP wired; locked merge sequence in OTP-verify (6 numbered steps, ORDER MATTERS comment); Sonner Toaster mounted globally. 11 new i18n keys (133 × 3). 14 new component tests + 5 e2e specs. OQ-23 (cold-chain on CartItemRead) + OQ-24 (PDP is_in_stock asymmetry) logged. All Phase 8 gates green; v0.8.0 tagged.
-- **Next session should:** read `FRONTEND_CLAUDE_CODE_PROMPTS.md §Phase 9`, re-read `FRONTEND_BLUEPRINT §6.3` (Idempotency-Key contract) + `§12` (forms) + `§14` (loading/error states), `DESIGN_BLUEPRINT §12.8 (checkout single-page)` + `§12.9 (order confirmation)`, `PRODUCT_BLUEPRINT §F-CHK-001..` (checkout features) + `§7.1 J-01 final steps`. Fetch backend `app/api/v1/checkout.py`, `app/domain/orders/checkout_service.py`, `app/domain/orders/schemas.py` (PlaceOrderRequest, PlaceOrderResponse, CheckoutQuote). Then post a Phase 9 plan covering: single-page `/checkout`; address picker (saved + inline new); payment radio (COD default; card hidden per Q-2); notes; sticky review; place-order with Idempotency-Key; order confirmation page at `/orders/{order_no}`. **Critical reminders per CLAUDE.md OP-13: checkout fetchers are mutation paths — throw loudly. Per CLAUDE.md domain reality > Idempotency: generate UUID once on form mount, reuse across retries.** No code until plan is approved.
+- **Sub-phases done:** Phase 0–8 + Phase 9A–9F (checkout). Phase 9 ships `lib/checkout/{schema,use-quote,mutations}.ts` (OP-13 throw-loudly contract held at 9A grep gate; zero catch blocks across the entire `lib/checkout/*` surface); `lib/observability/trace.ts` (Sentry breadcrumb stub); five section components (`Delivery`/`Payment`/`Recipient`/`Notes`Section + `ConflictBanner`); `AddressPicker` + `ReviewBlock`; `CheckoutForm` orchestrator with the seven-branch ORDER MATTERS conflict-resolution sequence; `/[locale]/checkout/page.tsx` with page-level empty-cart guard (per plan D3); `/[locale]/orders/[orderNumber]/page.tsx` with 3-attempt retry-fallback + success-framing fallback per plan vigilance directive #4. 28 new i18n keys × 3 (161 × 3 parity). 12 new test cases (6 idempotency-lifecycle / 7 schema / 2 ConflictBanner / 3 PaymentMethodSection regression-guard). All Phase 9 gates green.
+- **Next session should:** read `FRONTEND_CLAUDE_CODE_PROMPTS.md §Phase 10`, re-read `FRONTEND_BLUEPRINT §13` (orders) + `DESIGN_BLUEPRINT §12.10` (order list / detail / status timeline) + `PRODUCT_BLUEPRINT §F-ORD-*`. Fetch backend `app/api/v1/orders.py`, `app/domain/orders/order_service.py`, `app/domain/orders/schemas.py` (OrderListItem, OrderRead, OrderStatusRead, ReorderResponse). Then post a Phase 10 plan covering: `/[locale]/orders` list (paged); status timeline component; cancel-order flow with Dialog confirmation; reorder flow that pipes the snapshot back into the cart. **Critical reminders per CLAUDE.md sacred-invariants: order numbers always in `--text-mono` with PH- prefix; snapshot fields are immutable — display whatever the API returns, never refetch product detail to override.** No code until plan is approved.
 
 ---
 
@@ -25,8 +25,8 @@
 - [x] Phase 6 — Catalog Browse (read-only) _(done 2026-05-04; v0.6.0)_
 - [x] Phase 7 — PDP & Search _(done 2026-05-04; v0.7.0)_
 - [x] Phase 8 — Cart _(done 2026-05-04; v0.8.0)_
-- [ ] Phase 9 — Checkout & Order Placement _(active — plan pending)_
-- [ ] Phase 10 — Order History & Detail
+- [x] Phase 9 — Checkout & Order Placement _(done 2026-05-04; v0.9.0)_
+- [ ] Phase 10 — Order History & Detail _(next — plan pending)_
 - [ ] Phase 11 — Hardening: SEO, Perf, A11y
 - [ ] Phase 12 — Storefront Launch Readiness
 - [ ] Phase A1 — Admin Foundation & Login _(parallel after Phase 5)_
@@ -276,15 +276,36 @@ pnpm e2e --project chromium --grep-invert @requires-backend
 
 ### After Phase 9 — full J-01 (first-time symptom shopper)
 
+> **Backend prereqs unchanged from Phase 8.** Same smoke fixture (in-stock at branch_id=1) required.
+
 ```bash
 # Fresh user, no auth, no cart
 # /ru → Symptom tile → /ru/symptoms/headache → product card → /ru/products/{slug}
 # Add to cart; cart icon updates; /ru/cart shows line
-# /ru/checkout → enter address inline → confirm
-# OTP gate: phone, code from backend log, verify
-# Cart-merge workaround re-adds line (DECISION_LOG 2026-05-03); place order
-# Confirmation page shows PH- order number
-# Backend log shows place_order; database has order row with idempotency key cached
+# Click "Оформить заказ" → middleware redirects to /ru/auth/otp?return=/ru/checkout
+# Enter phone → OTP code from backend log → verify
+# Locked merge sequence runs: cart preserved across redirect to /ru/checkout
+# /ru/checkout populates: delivery selected (default address), recipient pre-filled
+#   from /me, sticky review on right shows totals from POST /quote
+# Edit address inline + change qty in /cart + come back → quote refetches; review updates
+# Place order → POST /place fires with Idempotency-Key header
+#   (verify in DevTools Network: Idempotency-Key: <uuid>)
+# Click Place again BEFORE the redirect lands → SAME UUID resent;
+#   backend dedups via Redis (24h TTL); response identical to first
+# Redirected to /ru/orders/PH-<num>; order number rendered in monospace;
+#   order summary populated from GET /me/orders/{order_number}
+# Backend log shows place_order; database has order row with idempotency_keys
+#   row pinned to the same UUID
+
+# Conflict-resolution dry-run (manual):
+# Have two browser tabs on /ru/checkout for the same cart.
+# In tab A: place order → 201 OK.
+# In tab B: place order → 409 checkout_conflict (cart now empty).
+# ConflictBanner surfaces with Edit-cart CTA.
+
+# Tests + gate:
+pnpm test --run                     # 24 files / 179 tests passing + 1 skipped
+pnpm e2e --project chromium --grep-invert @requires-backend   # CI gate (no backend)
 ```
 
 ### After Phase 12 — launch readiness
