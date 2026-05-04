@@ -5,6 +5,7 @@ import { hasLocale } from "next-intl"
 import * as React from "react"
 
 import { ActiveIngredientChip } from "@/components/product/ActiveIngredientChip"
+import { AddToCartButton } from "@/components/product/AddToCartButton"
 import { DeliveryBadge } from "@/components/product/DeliveryBadge"
 import { ImageCarousel } from "@/components/product/ImageCarousel"
 import {
@@ -23,7 +24,6 @@ import { getProductDetail, getRelatedProducts } from "@/lib/api/catalog"
 import type { ProductDetail } from "@/lib/api/types"
 import { BRAND, type BrandLocale } from "@/lib/brand"
 import { buildPageTitle } from "@/lib/seo/title"
-import { cn } from "@/lib/utils"
 
 // PDP — DESIGN §12.6. RSC. Phase 7 7B delivers the above-fold + below-fold
 // panels (carousel, name + manufacturer + stock + price + disabled CTA,
@@ -121,9 +121,6 @@ export default async function PdpPage({ params }: PdpPageProps) {
     })
   }
 
-  const ctaLabel = product.is_in_stock ? t("product.add_to_cart") : t("cart.out_of_stock")
-  const ctaDisabled = !product.is_in_stock
-
   return (
     <main className="mx-auto flex max-w-screen-xl flex-col gap-10 px-4 py-8 md:px-6 md:py-12">
       <section className="grid gap-6 md:grid-cols-2 md:gap-10">
@@ -160,20 +157,16 @@ export default async function PdpPage({ params }: PdpPageProps) {
             className="text-h2"
           />
 
-          <button
-            type="button"
-            disabled={ctaDisabled}
-            aria-disabled={ctaDisabled}
-            className={cn(
-              "text-body inline-flex items-center justify-center rounded-md px-5 py-3 font-medium",
-              "bg-brand-500 text-white",
-              "hover:bg-brand-600",
-              "disabled:bg-ink-200 disabled:text-ink-500 disabled:cursor-not-allowed",
-              "focus-visible:outline-ring focus-visible:outline-2 focus-visible:outline-offset-2",
-            )}
-          >
-            {ctaLabel}
-          </button>
+          {/* Phase 8 8D: PDP CTA wires to AddToCartButton. PDP-page-local
+           *  quantity stepper is a Phase 11 polish — for MVP the PDP
+           *  always adds quantity=1 and the customer adjusts qty in the
+           *  cart drawer / page after add. */}
+          <AddToCartButton
+            productId={product.id}
+            isInStock={product.is_in_stock}
+            quantity={1}
+            className="text-body px-5 py-3"
+          />
 
           {product.requires_prescription ? (
             <p className="text-body-sm text-warning-700">{t("product.requires_prescription")}</p>

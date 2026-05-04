@@ -5,6 +5,7 @@ import { type AbstractIntlMessages, NextIntlClientProvider } from "next-intl"
 import { Tooltip as TooltipPrimitive } from "radix-ui"
 import * as React from "react"
 
+import { Toaster } from "@/components/ui/sonner"
 import { ApiError } from "@/lib/api/errors"
 
 // AppProviders wraps the [locale] subtree with the three client-side
@@ -56,6 +57,11 @@ export function AppProviders({ locale, messages, children }: AppProvidersProps) 
     <QueryClientProvider client={queryClient}>
       <NextIntlClientProvider locale={locale} messages={messages} timeZone="Asia/Bishkek">
         <TooltipPrimitive.Provider>{children}</TooltipPrimitive.Provider>
+        {/* Phase 8 8D: Sonner Toaster mounts globally so cart mutations
+         *  (AddToCartButton + future cart actions) can dispatch toasts
+         *  via `toast.success()` / `toast.error()` from anywhere in the
+         *  client tree. */}
+        <Toaster position="top-right" richColors closeButton />
       </NextIntlClientProvider>
     </QueryClientProvider>
   )
