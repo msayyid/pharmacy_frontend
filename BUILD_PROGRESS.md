@@ -6,11 +6,11 @@
 
 ## Current state
 
-- **Active phase:** Phase 8 — Cart _(awaiting plan)_
-- **Status:** Phase 7 complete; Phase 8 plan due before any Phase 8 code.
+- **Active phase:** Phase 9 — Checkout & Order Placement _(awaiting plan)_
+- **Status:** Phase 8 complete; Phase 9 plan due before any Phase 9 code.
 - **Last session:** 2026-05-04
-- **Sub-phases done:** Phase 0–6 + Phase 7A–7F (PDP + search). Phase 7 ships PDP at `/[locale]/products/[slug]` with ImageCarousel (Embla) + description tabs/accordion + ActiveIngredientChip row + DeliveryBadge + SubstitutesBlock (Suspense for in-stock, inline for OOS-promoted-above-fold per R-F); search at `/[locale]/search` with SearchSynonymChips + popular-searches empty-state; SearchInput + SearchSuggest in the header (debounced 250ms, locale-aware via `getApiClientForLocale`); R-E gate regression suite. 22 new i18n keys (123 × 3). embla-carousel-react + shadcn Accordion as new deps. CLAUDE.md grows OPs 12 + 13 (audit FE plumbing first; mutations must throw). All Phase 7 gates green; v0.7.0 tagged.
-- **Next session should:** read `FRONTEND_CLAUDE_CODE_PROMPTS.md §Phase 8`, re-read `FRONTEND_BLUEPRINT §11 (state management — cart store)` + `§14.4 (toast guidelines)`, `DESIGN_BLUEPRINT §12.7 (cart page)` + `§13.6 (quantity stepper)`, `PRODUCT_BLUEPRINT §F-CART-001..005` + `§7.1` (J-01 cart steps), and `CLAUDE.md > Domain reality checks > Cart cookie + Snapshot immutability`. Fetch backend `app/api/v1/cart.py`, `app/domain/orders/cart_service.py`, `app/domain/orders/schemas.py` (CartRead, CartItemRead, CartTotalsRead). Then post a Phase 8 plan covering: cart drawer (desktop) + dedicated `/cart` page (both); add-to-cart action wired to ProductCard + PDP CTA; quantity stepper; remove; price-changed UX; stock-conflict UX; optimistic mutation + rollback. **Critical reminder per CLAUDE.md OP-13: cart fetchers are mutation paths and MUST throw ApiError loudly — do NOT copy the Phase 6/7 catch-and-empty pattern there.** No code until plan is approved.
+- **Sub-phases done:** Phase 0–7 + Phase 8A–8E (cart). Phase 8 ships `lib/cart/{queries,mutations,store}.ts` (OP-13 throw-loudly contract verified at 8A grep gate); `QuantityStepper` (rapid-click collapse to one PATCH per debounce window per plan D4); `CartLine` (in-stock / OOS / price-changed variants + nullable handling); `CartTotals` (subtotal + discount + delivery/total when non-null); `CartDrawer` globally mounted; `CartIconWithBadge` (distinct-lines count); `AddToCartButton` shared CTA; ProductCard + PDP wired; locked merge sequence in OTP-verify (6 numbered steps, ORDER MATTERS comment); Sonner Toaster mounted globally. 11 new i18n keys (133 × 3). 14 new component tests + 5 e2e specs. OQ-23 (cold-chain on CartItemRead) + OQ-24 (PDP is_in_stock asymmetry) logged. All Phase 8 gates green; v0.8.0 tagged.
+- **Next session should:** read `FRONTEND_CLAUDE_CODE_PROMPTS.md §Phase 9`, re-read `FRONTEND_BLUEPRINT §6.3` (Idempotency-Key contract) + `§12` (forms) + `§14` (loading/error states), `DESIGN_BLUEPRINT §12.8 (checkout single-page)` + `§12.9 (order confirmation)`, `PRODUCT_BLUEPRINT §F-CHK-001..` (checkout features) + `§7.1 J-01 final steps`. Fetch backend `app/api/v1/checkout.py`, `app/domain/orders/checkout_service.py`, `app/domain/orders/schemas.py` (PlaceOrderRequest, PlaceOrderResponse, CheckoutQuote). Then post a Phase 9 plan covering: single-page `/checkout`; address picker (saved + inline new); payment radio (COD default; card hidden per Q-2); notes; sticky review; place-order with Idempotency-Key; order confirmation page at `/orders/{order_no}`. **Critical reminders per CLAUDE.md OP-13: checkout fetchers are mutation paths — throw loudly. Per CLAUDE.md domain reality > Idempotency: generate UUID once on form mount, reuse across retries.** No code until plan is approved.
 
 ---
 
@@ -24,8 +24,8 @@
 - [x] Phase 5 — Auth & Account _(done 2026-05-03; v0.5.0)_
 - [x] Phase 6 — Catalog Browse (read-only) _(done 2026-05-04; v0.6.0)_
 - [x] Phase 7 — PDP & Search _(done 2026-05-04; v0.7.0)_
-- [ ] Phase 8 — Cart _(active — plan pending)_
-- [ ] Phase 9 — Checkout & Order Placement
+- [x] Phase 8 — Cart _(done 2026-05-04; v0.8.0)_
+- [ ] Phase 9 — Checkout & Order Placement _(active — plan pending)_
 - [ ] Phase 10 — Order History & Detail
 - [ ] Phase 11 — Hardening: SEO, Perf, A11y
 - [ ] Phase 12 — Storefront Launch Readiness
@@ -200,6 +200,78 @@ pnpm e2e --project chromium --grep-invert @requires-backend
 # → 13 passed, 1 skipped (Phase 4 + Phase 5 + Phase 6 specs that don't
 #    need a backend; the `@requires-backend` Phase 5 + Phase 6 specs are
 #    filtered out)
+```
+
+### After Phase 8 — cart live
+
+> **Backend prereqs unchanged from Phase 6/7 (docker-up + migrate + seed).**
+>
+> **Phase 8 smoke fixture (REQUIRED for in-stock add-to-cart).** Backend's
+> `BranchIdDep` hardcodes `branch_id=1` (Q-1 single-branch) but the seed
+> inventory lives at `branch_id=3`, so by default ALL products read OOS
+> via the catalog endpoints and the AddToCartButton stays disabled. The
+> smoke fixture inserts a `branches` row with id=1 cloned from id=3 and
+> mirrors the `branch_products` rows. **Apply once per fresh checkout;
+> document any divergence as OQ-25+.**
+>
+> ```bash
+> # Apply the Phase 8 smoke fixture:
+> docker exec pharmacy_backend-mysql-1 mysql --default-character-set=utf8mb4 -uroot -proot pharmacy -e "
+> INSERT INTO branches (id, code, name, address, city, phone, latitude, longitude, timezone, opens_at, closes_at, is_active, created_at, updated_at)
+> SELECT 1, 'BISHKEK_DEFAULT', name, address, city, phone, latitude, longitude, timezone, opens_at, closes_at, 1, NOW(6), NOW(6)
+> FROM branches WHERE id = 3;
+>
+> INSERT INTO branch_products (branch_id, product_id, price, compare_at_price, currency, is_available, total_quantity, reserved_quantity, low_stock_threshold, updated_at)
+> SELECT 1, product_id, price, compare_at_price, currency, is_available, total_quantity, reserved_quantity, low_stock_threshold, NOW(6)
+> FROM branch_products WHERE branch_id = 3;
+> "
+>
+> # Restart Redis to clear cached empty-arrays:
+> docker exec pharmacy_backend-redis-1 redis-cli FLUSHALL
+>
+> # Verify the catalog now reports in-stock:
+> curl -s -H "Accept-Language: ru" "http://localhost:8000/api/v1/categories/pain-relief/products?in_stock_only=true" | python3 -c "import json,sys; print(json.load(sys.stdin)['total'])"
+> # → 3
+>
+> # Revert when done:
+> docker exec pharmacy_backend-mysql-1 mysql --default-character-set=utf8mb4 -uroot -proot pharmacy -e "
+> DELETE FROM branch_products WHERE branch_id = 1;
+> DELETE FROM branches WHERE id = 1;
+> "
+> ```
+>
+> **OQ-24:** PDP endpoint reports is_in_stock=false even after the fixture
+> (different backend code path from catalog list). Cart-flow smoke uses
+> the category-page add-to-cart path, not PDP. Logged in OPEN_QUESTIONS.
+
+```bash
+# Manual smoke (storefront on :3000, backend with fixture applied):
+pnpm dev
+
+# Add-to-cart happy path:
+# /ru/categories/pain-relief → AddToCartButton enabled on 3 products
+# Click "Добавить в корзину" → Sonner toast appears top-right
+# Header cart badge shows "1"
+# Click cart icon (desktop): drawer slides in with the line
+# Click cart icon (mobile): navigates to /ru/cart
+# QuantityStepper +/- in /cart updates qty optimistically with debounced PATCH
+# Mash + button 5 times rapidly → ONE PATCH fires after 200ms (verify in
+#   Network tab; see DECISION_LOG D4)
+# Remove (trash icon) → line disappears, EmptyState renders
+# /ru/cart with empty cart → "Перейти к покупкам" CTA → /ru/categories
+
+# Cart-merge handoff (locked sequence per DECISION_LOG D12):
+# Add an in-stock item as guest → /ru/auth/otp → enter phone
+# OTP code: tail -n 50 /tmp/backend.log | grep -E 'code[":= ]+[0-9]{6}'
+# Verify → /ru/account; immediately navigate to /ru/cart
+# The previously-added item is preserved (merge ran in the verify handler)
+# R-C verification: NO flash of empty-state on /cart load
+
+# E2E (backend up + smoke fixture applied):
+pnpm e2e --project chromium --grep @requires-backend tests/e2e/{cart-flow,cart-merge}.spec.ts
+
+# CI gate (no backend):
+pnpm e2e --project chromium --grep-invert @requires-backend
 ```
 
 ### After Phase 9 — full J-01 (first-time symptom shopper)

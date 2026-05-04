@@ -1,6 +1,10 @@
 import { render, screen, within } from "@testing-library/react"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { NextIntlClientProvider } from "next-intl"
+import * as React from "react"
 import { describe, expect, it, vi } from "vitest"
 
+import { unflattenMessages } from "@/i18n/unflatten"
 import type { ProductCard as ProductCardData } from "@/lib/api/types"
 import ru from "@/messages/ru.json"
 
@@ -8,6 +12,11 @@ import ru from "@/messages/ru.json"
 // We mock it at module load with a stub that does flat-key lookup against
 // the real RU messages bundle, then dynamically import ProductCard so the
 // mock is in place before its top-level imports resolve.
+//
+// Phase 8: ProductCard now embeds <AddToCartButton> which uses TanStack
+// Query (useAddToCart) + next-intl client (useTranslations). The render
+// wrapper now provides QueryClientProvider + NextIntlClientProvider so
+// the rendered tree has the contexts these client hooks expect.
 vi.mock("next-intl/server", () => ({
   getTranslations: vi.fn().mockImplementation(async () => {
     const dict = ru as Record<string, string>
@@ -17,9 +26,26 @@ vi.mock("next-intl/server", () => ({
 
 const { ProductCard } = await import("@/components/product/ProductCard")
 
+function withProviders(node: React.ReactNode) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  })
+  return (
+    <QueryClientProvider client={client}>
+      <NextIntlClientProvider
+        locale="ru"
+        messages={unflattenMessages(ru as Record<string, string>)}
+        timeZone="Asia/Bishkek"
+      >
+        {node}
+      </NextIntlClientProvider>
+    </QueryClientProvider>
+  )
+}
+
 async function renderProductCard(product: ProductCardData) {
   const element = await ProductCard({ product, locale: "ru" })
-  return render(element)
+  return render(withProviders(element))
 }
 
 const baseProduct: ProductCardData = {

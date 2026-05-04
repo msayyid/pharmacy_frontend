@@ -11,10 +11,12 @@ test("homepage at / redirects to a locale-prefixed URL", async ({ page }) => {
   expect(response?.status()).toBe(200)
   await expect(page.locator("html")).toHaveAttribute("lang", /ru|ky|en/)
 
-  // Phase 6: header chrome is present on every storefront route. The "Cart"
-  // and "Categories" labels are localized, so we assert via the link's
-  // href which is locale-stable (matches /<locale>/cart, /<locale>/categories).
-  await expect(page.locator("header a[href$='/cart']")).toBeVisible()
+  // Phase 6/8: header chrome is present on every storefront route. The
+  // cart icon (via CartIconWithBadge) renders mobile-link + desktop-
+  // button as siblings — at least one with aria-label "Cart"/"Корзина"/
+  // "Себет" must be visible. The brand mark "Nookat"/"Ноокат" is also
+  // a stable header signal.
+  await expect(page.locator("header").getByText(/Nookat|Ноокат/)).toBeVisible()
   await expect(page.locator("header a[href$='/categories']").first()).toBeVisible()
   // Phase 6: footer rendered on the homepage (sticky-bottom pattern).
   await expect(page.locator("footer")).toBeVisible()
