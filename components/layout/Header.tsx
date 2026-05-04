@@ -5,6 +5,7 @@ import { cookies } from "next/headers"
 
 import { LangSwitcher } from "@/components/i18n/LangSwitcher"
 import { MobileMenu } from "@/components/layout/MobileMenu"
+import { SearchInput } from "@/components/search/SearchInput"
 import { BRAND } from "@/lib/brand"
 import { cn } from "@/lib/utils"
 
@@ -91,18 +92,12 @@ export async function Header({ locale }: HeaderProps) {
             <SearchIcon aria-hidden="true" className="size-5" />
           </Link>
 
-          <Link
-            href={`/${locale}/search`}
-            className={cn(
-              "md:border-ink-200 md:bg-surface-app hidden md:inline-flex md:h-10 md:w-80 md:items-center md:gap-2 md:rounded-md md:border md:px-3",
-              "md:text-body-sm md:text-ink-500",
-              "md:hover:border-ink-300",
-              "md:focus-visible:outline-ring md:focus-visible:outline-2 md:focus-visible:outline-offset-2",
-            )}
-          >
-            <SearchIcon aria-hidden="true" className="size-4" />
-            <span>{t("search.placeholder")}</span>
-          </Link>
+          {/* Phase 7 7E: real SearchInput on desktop with debounced suggest
+           *  dropdown. Mobile keeps the icon-link-to-/search above for
+           *  the full-screen overlay (Phase 11+ enhancement). */}
+          <div className="hidden md:block md:w-80">
+            <SearchInput locale={locale} />
+          </div>
 
           <div className="hidden md:flex">
             <LangSwitcher />
