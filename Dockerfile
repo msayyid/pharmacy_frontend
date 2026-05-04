@@ -28,6 +28,15 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+# Phase 12E — runtime fallback env so `docker run` smoke works without
+# a `-e API_URL=...` flag (the gap surfaced in Phase 11F when sitemap.ts
+# started pulling lib/env/server.ts at request time). Real deploys
+# (Coolify) override these at runtime via the project's env panel; the
+# fallback is for local docker smoke only.
+ENV API_URL=http://localhost:8000 \
+    NEXT_PUBLIC_API_URL=http://localhost:8000 \
+    NEXT_PUBLIC_DEFAULT_LOCALE=ru \
+    NEXT_PUBLIC_ENV=development
 RUN addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 nextjs
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public

@@ -6,6 +6,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.0.0-rc1] - 2026-05-05
+
+> Storefront feature-complete; version parity with backend `v1.0.0-rc1`. Remaining work is launch ops (real DSN, Coolify deploy, real legal text, real logo, KY/EN human review) tracked in `LAUNCH_CHECKLIST.md`.
+
+### Added
+
+- Phase 12A — Legal page shells: `app/[locale]/legal/{terms,privacy,delivery,returns}/page.tsx` + `components/legal/LegalPlaceholderShell.tsx`. Each renders DESIGN §13.7 warning-tone callout banner ("Этот текст — заглушка") + sacred-invariant #4 phone CTA + last-updated placeholder. `metadata.robots = noindex,nofollow` until real text lands (footer already wires the routes per Phase 6 6A; no chrome change needed). Replace placeholder copy + flip to `index: true` + add to `app/sitemap.ts` when legal text passes counsel review.
+- Phase 12A — 8 new i18n keys × 3 locales (228 → 236 parity): `legal.{terms,privacy,delivery,returns}.title` + `legal.{last_updated_placeholder, placeholder_banner_label, placeholder_banner_title, placeholder_banner_body}`.
+- Phase 12B — `docs/ARCHITECTURE.md`: text-based topology diagram (Customer → Caddy/Traefik → Next standalone → FastAPI), stack table, repo layout, auth flow, Sentry/PII discipline, security headers, build/deploy, verification gate command.
+- Phase 12B — `docs/CONTRIBUTING.md`: prerequisites, first-time setup, the verification gate as the canonical pre-PR command, Conventional Commits format with scope vocabulary, branching, code conventions cross-reference (DESIGN §21 + FRONTEND §21), i18n add-a-key procedure, top-level dep policy.
+- Phase 12B — `docs/runbooks/deploy.md`: per-environment env-var table (S=server-only / P=public, staging vs prod columns), first-time staging setup (Coolify project / domain / TLS / health-check / reverse-proxy headers / backend CORS), production setup gate, CSP refinement workflow (start in Report-Only, soak 1 week, enforce), standard push-driven deploy + rollback (Coolify UI vs `git revert`), build env-mismatch failure mode, disaster scenarios (VPS down / Coolify down / cert expired).
+- Phase 12B — `docs/runbooks/monitoring.md`: signal locations, Sentry first-look triage checklist, Web Vitals targets table (matches FRONTEND §17.1), PII discipline reminder + P0 procedure if PII appears in Sentry, alert routing TBD, backend-correlation via `X-Request-ID`, Coolify health graphs, daily/weekly/monthly health rhythm.
+- Phase 12B — `docs/runbooks/incidents.md`: severity matrix (P0–P3 with response times), playbooks for site-down 5xx, PII leak (P0 — discard event + add to scrub regex + regression test + redeploy), OTP not arriving, `POST /checkout/place` 5xx + idempotency-conflict variants, cart-merge regression, locale-switch broken page, OQ-24 PDP `is_in_stock` asymmetry, communication norms, post-mortem template.
+- Phase 12C — `playwright.smoke.config.ts`: separate Playwright config requiring `E2E_BASE_URL` (no webServer fallback, throws if env missing). Single chromium project. Long timeouts for over-network runs.
+- Phase 12C — `tests/smoke/` suite (6 specs, read-only): `health.smoke.ts` (status:ok + version structure), `homepage.smoke.ts` (`/ru` renders header/footer/h1 + tap-to-call link; `/` redirects to locale; locale switch lands), `security-headers.smoke.ts` (the 4 Phase 11E headers + HSTS verified only behind https://), `seo.smoke.ts` (sitemap.xml is XML with locale URLs; robots.txt allows / and disallows hard-gated routes), `pdp.smoke.ts` (drills from homepage → product link → PDP h1 + CTA, skips if catalog empty), `search.smoke.ts` (`/ru/search` landing + `?q=пара` results render). `pnpm smoke` script wired.
+- Phase 12C — `LAUNCH_CHECKLIST.md`: comprehensive pre-launch gate mirroring backend's pattern. Sections: Code & tests / Security / Observability / Deployment / Content / Brand / i18n / Accessibility / Backend coordination / Smoke tests / Final gate. Cross-references `BUILD_PROGRESS.md > Backlog > Pre-launch checklist` rather than duplicating (single source of truth). Lists Phase-1.5+ items as explicitly out-of-scope at launch.
+- Phase 12D — `scripts/launch-checks.mjs` + `pnpm launch:check`: 6 automated grep gates that ship fast feedback on sacred-invariant compliance:
+  1. Brand discipline — literal "Nookat" only in `lib/brand.ts`, `lib/seo/jsonld.tsx` (PostalAddress city), `messages/*.json`, tests, comments, docs/markdown.
+  2. `dangerouslySetInnerHTML` scoped to `lib/seo/jsonld.tsx` (Phase 11A D11 carve-out).
+  3. No raw hex (`#xxxxxx`) in components/app code (DESIGN §21.1 token discipline). `app/global-error.tsx` exempt (bare-HTML fallback intentionally has no Tailwind).
+  4. No `confirm()` / `alert()` (sacred-invariant #16; use shadcn Dialog / AlertDialog).
+  5. No `console.log` of `phone` / `email` / `address` / `recipient_phone` (sacred-invariant #8; complements the runtime PII scrub).
+  6. Sentry SDK wiring files exist (`instrumentation.ts` + `instrumentation-client.ts` + `sentry.{server,edge}.config.ts`).
+     All 6 green at phase close. Comment-line filter prevents false positives on JSDoc that legitimately mentions e.g. `confirm()` or "Nookat" in spec references.
+- Phase 12E — `.env.example` rewrite: inline split of public-vs-server-only with per-environment guidance (local / staging / production), 9-step "when you add a new env var" checklist (mirror to `lib/env/{server,client}.ts` + CI workflow + `scripts/build-ci.sh` + Dockerfile + runbook), explicit `NEXT_PUBLIC_SITE_URL` + `SENTRY_AUTH_TOKEN` + `ANALYZE` documentation.
+- Phase 12E — `Dockerfile` runtime stage gains fallback `ENV API_URL=… NEXT_PUBLIC_API_URL=… NEXT_PUBLIC_DEFAULT_LOCALE=ru NEXT_PUBLIC_ENV=development` so `docker run` smoke works without `-e API_URL=…` flags. Closes the gap surfaced at Phase 11F where `/sitemap.xml` started pulling `lib/env/server.ts` at request time. Real Coolify deploys override these via the project's env panel.
+- Phase 12E — `app/api/health/route.ts` exposes `{status, version, environment, sha?}`. Reads from `package.json.version` (replaces the hardcoded "0.1.0"); reads `process.env.NEXT_PUBLIC_ENV` and `SENTRY_RELEASE` at request time (`force-dynamic` ensures Coolify env reaches the handler). `sha` omitted in production to avoid leaking the build SHA publicly; smoke suites still get `version`.
+
+### Notes
+
+- **Storefront is feature-complete.** All 12 phases shipped. The next code track is the admin app (`nookat-admin` repo, separate codebase, Phase A1–A6).
+- **Tag carve-out from CLAUDE.md OP-11.** Phase 12 = `v1.0.0-rc1` (release candidate; full `v1.0.0` lands after the launch checklist's human-work boxes are checked and a successful staging soak — see `LAUNCH_CHECKLIST.md > Final gate`).
+- **Smoke suite is read-only by design.** No OTP-login smoke (Q13 SMS deferred); no place-order smoke (would litter the staging DB). Mutations are covered in the e2e `@requires-backend` suite against a known dev backend.
+- **Brand discipline gate caught zero offenders** at first run after the comment-line filter was added. Future: when adding new copy, make sure literal "Nookat" doesn't slip into JSX/string-literal positions in `app/`, `components/`, `lib/` outside `lib/brand.ts` and `lib/seo/jsonld.tsx`.
+- **Health endpoint flipped from `force-static` to `force-dynamic`.** The previous static handler froze the `version` constant at build time and ignored runtime env. The new dynamic handler reads `process.env.NEXT_PUBLIC_ENV` and `SENTRY_RELEASE` at request time, which is what Coolify needs to verify which build is live (`curl https://staging.nookat.kg/api/health` returns the running version, not whatever was baked at build).
+- **Build receipts at phase close.** `pnpm lint` 0; `pnpm typecheck` 0; `pnpm test` 39 files / 287 tests passing + 1 skipped; `pnpm i18n:check` 236 × 3 parity (was 228 × 3); `pnpm build` 0; `pnpm build:ci` 0; `pnpm launch:check` ✓ all 6 grep gates green; `pnpm e2e --project chromium --grep-invert @requires-backend` 18 passed + 1 skipped; `docker build` 0; `docker run` (no -e flags): `/api/health` 200 with `{status:"ok",version:"0.1.0",environment:"test"}`, security headers present, `/ru/legal/terms` 200, `/sitemap.xml` 200, `/robots.txt` 200, `/ru/orders` 307 → `/ru/auth/otp?return=%2Fru%2Forders` (Phase 5 D4 hard gate intact through Phase 12).
+
 ## [0.11.0] - 2026-05-04
 
 ### Added

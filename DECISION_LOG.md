@@ -504,3 +504,56 @@
 - Bundle analyzer: drop `withAnalyzer` wrap.
 
 **References.** `FRONTEND_BLUEPRINT §17 (perf budgets) / §18 (security) / §19 (Sentry) / §20 (testing)`; `DESIGN_BLUEPRINT §14 (empty/loading/error) / §16 (a11y)`; `FRONTEND_CLAUDE_CODE_PROMPTS §Phase 11`; CLAUDE.md sacred-invariants #4 / #8 + hard-prohibition #11. Phase 11 plan in chat 2026-05-04.
+
+---
+
+### 2026-05-05 — Phase 12: Storefront launch readiness (v1.0.0-rc1)
+**Phase:** 12
+**Context.** Final phase before the storefront serves real customers. Mostly polish + ops glue — the highest ratio of "human work" to "code work" of any phase. The prompt's DoD is partially blocked by infrastructure not-yet-stood-up (Coolify project, real DSN, real legal text, real logo). Decision: ship code-side completeness now, tag `v1.0.0-rc1`, document the human-work gates in `LAUNCH_CHECKLIST.md` so the launch path is unambiguous.
+
+**Decisions.**
+
+- **D1 — Legal pages live at `/[locale]/legal/{terms,privacy,delivery,returns}`, not `/[locale]/{terms,...}`.** Phase 12 prompt suggested the unprefixed path, but Phase 6 6A already wired the footer with `/legal/...` paths. Matching the existing convention avoids broken-link rework + footer audit churn.
+
+- **D2 — Single `<LegalPlaceholderShell>` component, not 4 inlined shells.** Saves ~80 lines of duplication; consistent placeholder banner across all 4 routes; one file to update when the placeholder UX is refined. Per-page differentiation is just the title prop.
+
+- **D3 — Legal placeholders are `noindex,nofollow`.** Real legal text gates production launch (the placeholder is for staging soak). We don't want Google caching the "this is a placeholder" copy. When real text lands: flip `robots: { index: true, follow: true }` per page AND add the routes to `app/sitemap.ts` (currently excluded — there's no SEO value in indexing placeholders).
+
+- **D4 — Smoke suite is READ-ONLY at MVP.** Phase 12 prompt mentions "A test user can OTP-login (using a known dev SMS code via API)" and "Place order goes through" as smoke items. Both rejected for staging:
+  - **OTP smoke** would require backend's `PHARMACY_BACKEND_SMS_PROVIDER=fake` adapter live on staging (defeats the point of staging being prod-shaped) OR a real Nikita SMS round-trip (Q13 deferred — unavailable + costs money).
+  - **Place-order smoke** would litter the staging DB with test orders that look real to operators and confuse fulfillment QA. Worse, an accidental smoke run against production would create real fake orders.
+  Trade-off: mutation paths are covered by the e2e `@requires-backend` suite against a known local backend, not against staging. Staging soak relies on (a) read-only smokes catching deployment regressions, (b) Sentry catching runtime errors, (c) human QA following the manual smoke recipes in `BUILD_PROGRESS.md > Smoke recipes > After Phase 9` (J-01 happy path). When backend Q13 lands real Nikita SMS in production, we can add a happy-path smoke against a fixed test phone in production-shadow mode.
+
+- **D5 — `playwright.smoke.config.ts` separate from `playwright.config.ts`.** Two reasons: (1) smoke must NOT spin up a dev server (`webServer` block must be absent — staging is the source of truth); (2) smoke uses a different testDir + naming pattern (`*.smoke.ts`) so `pnpm e2e` doesn't accidentally pick up smoke tests when a developer just wants the local CI gate. The split is small and the configs share nothing material.
+
+- **D6 — `LAUNCH_CHECKLIST.md` cross-references rather than duplicates.** Pre-launch backlog items already live in `BUILD_PROGRESS.md > Backlog > Pre-launch checklist` (assembled across Phases 5 / 9 / 11). Duplicating them in `LAUNCH_CHECKLIST.md` would create drift; linking them keeps a single source of truth. Updates to the backlog automatically reflect in the checklist's gate.
+
+- **D7 — Six grep gates in `scripts/launch-checks.mjs`, comment-line filter is the trick.** First run flagged 12 brand-discipline "violations" + 3 confirm/alert "violations" — every one was a JSDoc comment legitimately mentioning the term. Filter (lines whose first non-whitespace is `//` / `*` / `/*`) brought the offender count to zero. Without the filter the gate would be untrustworthy and operators would learn to ignore it. With the filter the green output is meaningful.
+
+- **D8 — `lib/seo/jsonld.tsx` allowed to use literal "Nookat"/"Ноокат".** The PostalAddress JSON-LD blocks have `addressLocality: locale === "en" ? "Nookat" : "Ноокат"` — but here "Nookat"/"Ноокат" is the *city name*, not the brand wordmark. Routing through `BRAND.nameLocalized` would conflate brand and city semantics (the brand happens to be named after the city). Adding `lib/seo/jsonld.tsx` to the allowlist is more correct than refactoring the JSON-LD to use BRAND constants for what should be a postal-address field.
+
+- **D9 — `app/global-error.tsx` exempt from the raw-hex grep gate.** This file intentionally uses inline `style` with hex literals because it must render WITHOUT the React/Tailwind/next-intl provider chain (it's the boundary that fires when those providers themselves crash). Exempting it is correct; flagging it would force us to either inline a Tailwind reset (which defeats the bare-HTML safety net) or split a CSS file (which also requires Next routing to work).
+
+- **D10 — Health endpoint `force-dynamic`, not `force-static`.** Previous `force-static` handler froze `version` and ignored runtime env. Coolify operators need `curl /api/health` to return the actual running build. `force-dynamic` reads `process.env.NEXT_PUBLIC_ENV` + `SENTRY_RELEASE` at request time, which is what Coolify injects post-build. Cost: one render per health-check (every 30s in our config) — negligible.
+
+- **D11 — Health endpoint `sha` field gated to non-production.** Returning git SHA helps Coolify operators verify deploys, but in production the SHA is information that doesn't need to be public (a curl from anywhere would reveal it). Trade-off: production loses some debug convenience; gain is one less data leak. Operators with VPS access can still read SENTRY_RELEASE from Coolify directly.
+
+- **D12 — Dockerfile runtime stage gets fallback ENV.** Phase 11F surfaced the gap: `/sitemap.xml` started pulling `lib/env/server.ts` at request time, and `docker run` without `-e API_URL=...` flags hit a ZodError. Phase 12E fix: ENV block in the runtime stage with dev-shaped fallbacks. Real Coolify deploys override these via the project's env panel; the fallback is for local docker-run smoke convenience. This is NOT a contract weakening — `lib/env/server.ts` still Zod-fails on missing env per Phase 3 D11; we're just providing dev defaults at the container boundary so the smoke path doesn't surprise developers.
+
+- **D13 — Tag is `v1.0.0-rc1`, not `v0.12.0`.** Per CLAUDE.md OP-11: "Phase 12 = `v1.0.0-rc1`". This carves out from the otherwise mechanical `v0.N.0` pattern because Phase 12 is the production-readiness gate, and the tag's semver communicates "release candidate, soaking before `v1.0.0`." The full `v1.0.0` tag lands after `LAUNCH_CHECKLIST.md > Final gate` is checked (real legal text + KY/EN review + Coolify staging soak + production deploy).
+
+**Side findings.**
+
+- **next-intl middleware deprecation warning** (RISKS R-13) still fires on every dev/build/e2e run. next-intl 4.11 still doesn't expose a `proxy` export. Re-evaluate at admin Phase A1+ (admin will need its own middleware composition; that may force a migration).
+- **DM_Serif_Display unused warning** still fires. Kitchen-sink uses it; can drop both the font and the kitchen sink in a future cleanup pass if we decide the kitchen sink is dev-only debt.
+- **Health endpoint's `import packageJson with { type: "json" }` syntax.** Modern import-attributes syntax; supported in Next 15 + TS 5.5+. Replaces the previous hardcoded `APP_VERSION = "0.1.0"` string.
+
+**Reversibility.** Every Phase 12 decision is local + reversible:
+- Legal placeholders: replace shell content with real text per page; flip `robots`.
+- Smoke suite: extend to mutation tests when staging is ready for fake-SMS happy paths.
+- LAUNCH_CHECKLIST: pure documentation; rewrite freely.
+- Grep gates: turn off any check by deleting its `check(...)` block.
+- Dockerfile fallback ENV: delete the runtime ENV block; consumers must pass `-e` flags again.
+- Health endpoint: revert to static if request-time env reads turn out to cause issues at scale.
+
+**References.** `FRONTEND_BLUEPRINT §22 (build/deploy)`; `DESIGN_BLUEPRINT §21 (conventions checklist)`; `FRONTEND_CLAUDE_CODE_PROMPTS §Phase 12`; `CLAUDE.md > Sacred invariants / Hard prohibitions / OP-11 (tag convention)`. Phase 12 plan in chat 2026-05-05.

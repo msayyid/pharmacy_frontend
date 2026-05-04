@@ -6,11 +6,11 @@
 
 ## Current state
 
-- **Active phase:** Phase 11 — Hardening: SEO, Perf, A11y _(complete; tagged v0.11.0)_
-- **Status:** Phase 11 complete and tagged v0.11.0. SEO foundation (sitemap.xml + robots.txt + JSON-LD on indexable surfaces), `generateMetadata` on every public route + noindex on hard-gated transactional layouts, error/not-found/global-error boundaries, RSC loading skeletons on heavy fetcher segments, full Sentry SDK wiring (no-op without DSN — DSN deferred to Phase 12 Coolify deploy), Web Vitals → Sentry breadcrumb stream, structured logger + PII scrubber, security headers on every response, axe-core sweep (vitest + e2e), bundle analyzer.
-- **Last session:** 2026-05-04
-- **Sub-phases done:** Phase 0–10 + Phase 11A–11F. Phase 11A: `app/sitemap.ts` + `app/robots.ts` + `lib/seo/{jsonld.tsx,site-url.ts}` + tests. 11B: `generateMetadata` on home/PDP (extended with JSON-LD) + categories/symptoms/about/search; per-segment noindex layouts on cart/checkout/orders/account/auth (5 thin layouts so Client-Component pages can still ship robots metadata); 18 SEO i18n keys × 3 locales (210 → 228 parity). 11C: `app/[locale]/error.tsx` + `not-found.tsx` + `app/global-error.tsx` + 4 RSC `loading.tsx` skeletons; tests for error + not-found surfaces. 11D: full Sentry SDK wiring across `instrumentation.ts` + `sentry.{server,edge}.config.ts` + `instrumentation-client.ts` (DSN-optional — no-op without); `lib/observability/{trace.ts,scrub.ts}` PII scrub at two layers; `lib/log.ts`; `<WebVitalsReporter />` mounted in layout. 11E: security headers in `next.config.ts`; `vitest-axe@0.1.0` + `axe-core` wiring (had to manually `expect.extend` matchers since the package's `extend-expect.js` ships empty); 9-case axe pattern coverage + 5-case e2e a11y spec (Phase 11 prompt DoD: zero CRITICAL — serious-tier color-contrast deferred to pre-launch human polish per BUILD_PROGRESS backlog); `@next/bundle-analyzer` + `pnpm analyze`. 11F: full verification gate green; v0.11.0 tagged + pushed.
-- **Next session should:** read `FRONTEND_CLAUDE_CODE_PROMPTS.md §Phase 12`, re-read `FRONTEND_BLUEPRINT §22 (build/deploy)` + `DESIGN_BLUEPRINT §21 (conventions checklist)`. Phase 12 launch readiness covers: legal pages (Terms / Privacy / Delivery / Returns shells with placeholder text), docs (`docs/{ARCHITECTURE,CONTRIBUTING,runbooks/*}.md`), Coolify deploy configuration with real `SENTRY_DSN` + `NEXT_PUBLIC_SITE_URL` + `API_URL` env vars, smoke-test suite that runs against staging, security headers verified via curl on staging, Lighthouse green at staging URLs, all sacred invariants verified end-to-end. **First Phase 12 task: confirm pre-launch checklist items in BUILD_PROGRESS aren't stale.** No code until plan is approved.
+- **Active phase:** Phase 12 — Storefront Launch Readiness _(complete; tagged v1.0.0-rc1)_
+- **Status:** Phase 12 complete and tagged v1.0.0-rc1. Storefront at version parity with backend. Legal page shells (4 routes with placeholder banner + sacred-invariant #4 phone CTA + noindex), runbooks (`docs/{ARCHITECTURE,CONTRIBUTING}.md` + `docs/runbooks/{deploy,monitoring,incidents}.md`), read-only smoke suite (`tests/smoke/` + `playwright.smoke.config.ts`), `LAUNCH_CHECKLIST.md` mirroring backend's pattern, automated grep gates (`scripts/launch-checks.mjs` + `pnpm launch:check`), `.env.example` audit + Dockerfile runtime ENV (closes the Phase 11F gap where docker-run smoke needed `-e API_URL=...`), health endpoint exposes `version + environment + sha` (sha env-gated to non-prod). **First public-launch gate: `LAUNCH_CHECKLIST.md`.**
+- **Last session:** 2026-05-05
+- **Sub-phases done:** Phase 0–11 + Phase 12A–12F. Phase 12A: 4 legal page shells via `<LegalPlaceholderShell>` (warning-tone banner per DESIGN §13.7, sacred-invariant #4 phone CTA, noindex until real text lands, route at `/[locale]/legal/{terms,privacy,delivery,returns}`); 8 i18n keys × 3 locales (228 → 236 parity). 12B: `docs/ARCHITECTURE.md` (text-based topology + stack + repo layout + auth + Sentry + security headers), `docs/CONTRIBUTING.md` (local setup + verification gate + Conventional Commits), `docs/runbooks/deploy.md` (Coolify per-env table + first-time setup + CSP refinement workflow + rollback paths), `docs/runbooks/monitoring.md` (Sentry triage + Web Vitals + PII discipline), `docs/runbooks/incidents.md` (P0–P3 playbooks + post-mortem template). 12C: `playwright.smoke.config.ts` (requires `E2E_BASE_URL`, no webServer fallback) + 6 read-only smoke specs (homepage / pdp / search / health / security-headers / seo); `LAUNCH_CHECKLIST.md` mirrors backend's pattern with cross-references to `BUILD_PROGRESS.md > Backlog > Pre-launch checklist`. 12D: `scripts/launch-checks.mjs` runs 6 grep gates (brand discipline, JSON-LD dSI scope, raw hex, confirm/alert, PII patterns, Sentry SDK wiring); comment-line filter prevents false positives; `pnpm launch:check`. 12E: `.env.example` rewrite with inline server-only-vs-public split + per-env table; Dockerfile runtime ENV fallback (`API_URL`, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_DEFAULT_LOCALE`, `NEXT_PUBLIC_ENV`) so docker-run smoke works without `-e` flags; `app/api/health/route.ts` exposes `version + environment + sha` (sha gated to non-prod) using `force-dynamic` so request-time env reads work. 12F: full verification gate green; v1.0.0-rc1 tagged + pushed.
+- **Next session should:** the storefront is at v1.0.0-rc1 — feature-complete, all 12 phases shipped. **Next is launch ops, not build phases.** The remaining work lives in `LAUNCH_CHECKLIST.md` and is mostly out-of-band human work: legal text, real DSN, Coolify deploy, KY pharmacist review, EN human review, NVDA/VoiceOver SR test, real logo/phone/address/license, backend Q13/Q14/Q15. The next CODE phase is **Phase A1 — Admin Foundation & Login** (separate `nookat-admin` repo); admin track A1–A6 has been clear to start since Phase 5 close. Confirm intent before starting A1: this repo is feature-complete; A1+ is a different repo and a different design language (admin RU-only, desktop-first, dense — DESIGN §19).
 
 ---
 
@@ -28,7 +28,7 @@
 - [x] Phase 9 — Checkout & Order Placement _(done 2026-05-04; v0.9.0)_
 - [x] Phase 10 — Order History & Detail _(done 2026-05-04; v0.10.0)_
 - [x] Phase 11 — Hardening: SEO, Perf, A11y _(done 2026-05-04; v0.11.0)_
-- [ ] Phase 12 — Storefront Launch Readiness
+- [x] Phase 12 — Storefront Launch Readiness _(done 2026-05-05; v1.0.0-rc1)_
 - [ ] Phase A1 — Admin Foundation & Login _(parallel after Phase 5)_
 - [ ] Phase A2 — Admin Orders Queue & Picking
 - [ ] Phase A3 — Admin Catalog CRUD
@@ -424,15 +424,44 @@ pnpm dlx @lhci/cli@latest collect --url=http://localhost:3000/ru
 # Inspect .lighthouseci/ for the run report.
 ```
 
-### After Phase 12 — launch readiness
+### After Phase 12 — launch readiness (storefront feature-complete)
+
+> Phase 12 closes the storefront at `v1.0.0-rc1` parity with backend. Code is shipped; the remaining work is launch ops (real DSN, Coolify deploy, real legal text, real logo, etc.) tracked in `LAUNCH_CHECKLIST.md`. The recipe below proves the v1.0.0-rc1 build is production-ready in code; staging validation is human work that happens after Coolify deploy.
 
 ```bash
-# Staging deploy on Coolify
+# Tests + gate (matches Phase 11 + adds launch:check + smoke config validate):
+pnpm lint                       # 0
+pnpm typecheck                  # 0
+pnpm test --run                 # 39 files / 287 tests + 1 skipped
+pnpm i18n:check                 # 236 × 3 parity (was 228 × 3; +8 legal keys)
+pnpm build                      # 0
+pnpm build:ci                   # 0
+pnpm launch:check               # 6 grep gates green
+pnpm e2e --project chromium --grep-invert @requires-backend
+# → 18 passed + 1 skipped
+
+# Docker smoke now works without -e flags (Phase 12E Dockerfile runtime
+# ENV fallback closes the gap surfaced at Phase 11F):
+docker build -t nookat-storefront:phase12 .
+docker run -d --rm -p 3001:3000 --name nookat-test nookat-storefront:phase12
+sleep 5
+curl -s http://localhost:3001/api/health  # → {"status":"ok","version":"0.1.0","environment":"test"}
+curl -sI http://localhost:3001/ru | grep -iE 'x-frame|content-type-options|referrer|permissions'
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3001/ru/legal/terms   # → 200
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3001/sitemap.xml      # → 200
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3001/robots.txt       # → 200
+curl -s -o /dev/null -w "%{http_code} %{redirect_url}\n" \
+  http://localhost:3001/ru/orders -L --max-redirs 0
+# → 307 http://localhost:3001/ru/auth/otp?return=%2Fru%2Forders
+docker stop nookat-test
+
+# Smoke suite (run AFTER Coolify staging deploy; pre-deploy this is empty):
+E2E_BASE_URL=https://staging.nookat.kg pnpm smoke
+# → 6 specs: homepage / pdp / search / health / security-headers / seo
+
+# After staging soak:
 curl -sI https://staging.nookat.kg | grep -E '^(strict-transport|content-security|x-frame|referrer)'
-# All security headers present
-# Lighthouse against staging: ≥90 perf on / and /ru/products/<slug>; 100 a11y
-pnpm e2e --config=playwright.smoke.ts --base-url=https://staging.nookat.kg
-# All smoke tests pass
+# Lighthouse local-or-CI against staging: ≥90 perf on / and /ru/products/<slug>; 100 a11y
 ```
 
 ---

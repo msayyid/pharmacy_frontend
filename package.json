@@ -18,10 +18,12 @@
     "test:watch": "vitest",
     "e2e": "playwright test",
     "e2e:install": "playwright install --with-deps chromium",
+    "smoke": "playwright test --config=playwright.smoke.config.ts",
     "types:generate": "openapi-typescript ${API_URL:-http://localhost:8000}/openapi.json -o generated/api.d.ts",
     "types:generate:snapshot": "openapi-typescript ./openapi.json -o generated/api.d.ts",
     "types:check": "pnpm types:generate:snapshot && git diff --exit-code generated/api.d.ts",
     "i18n:check": "node scripts/i18n-check.mjs",
+    "launch:check": "node scripts/launch-checks.mjs",
     "analyze": "ANALYZE=true next build",
     "prepare": "husky"
   },
