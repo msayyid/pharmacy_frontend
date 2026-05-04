@@ -5,8 +5,10 @@ import { getMessages } from "next-intl/server"
 import { notFound } from "next/navigation"
 
 import { AppProviders } from "@/app/providers"
+import { CartDrawer } from "@/components/cart/CartDrawer"
 import { Footer } from "@/components/layout/Footer"
 import { Header } from "@/components/layout/Header"
+import type { Locale } from "@/i18n/config"
 import { BRAND } from "@/lib/brand"
 import { locales } from "@/i18n/config"
 import "../globals.css"
@@ -70,6 +72,9 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
           <Header locale={locale} />
           <main className="flex-1">{children}</main>
           <Footer locale={locale} />
+          {/* Phase 8 8C: globally-mounted drawer so the Header's desktop
+           *  cart-icon button can trigger it on any route. */}
+          <CartDrawer locale={locale as Locale} />
         </AppProviders>
       </body>
     </html>

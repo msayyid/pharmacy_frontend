@@ -1,9 +1,10 @@
-import { SearchIcon, ShoppingCartIcon, UserIcon } from "lucide-react"
+import { SearchIcon, UserIcon } from "lucide-react"
 import { getTranslations } from "next-intl/server"
 import Link from "next/link"
 import { cookies } from "next/headers"
 
 import { LangSwitcher } from "@/components/i18n/LangSwitcher"
+import { CartIconWithBadge } from "@/components/layout/CartIconWithBadge"
 import { MobileMenu } from "@/components/layout/MobileMenu"
 import { SearchInput } from "@/components/search/SearchInput"
 import { BRAND } from "@/lib/brand"
@@ -115,17 +116,11 @@ export async function Header({ locale }: HeaderProps) {
             <UserIcon aria-hidden="true" className="size-5" />
           </Link>
 
-          <Link
-            href={`/${locale}/cart`}
-            aria-label={t("nav.cart")}
-            className={cn(
-              "inline-flex h-11 w-11 items-center justify-center rounded-md",
-              "text-ink-700 hover:bg-ink-50",
-              "focus-visible:outline-ring focus-visible:outline-2 focus-visible:outline-offset-2",
-            )}
-          >
-            <ShoppingCartIcon aria-hidden="true" className="size-5" />
-          </Link>
+          {/* Phase 8 8C: replaces the stub cart icon with the live
+           *  badge-aware client island. Renders mobile <Link> + desktop
+           *  <button>-trigger-drawer as siblings via Tailwind responsive
+           *  classes (see CartIconWithBadge for the shape). */}
+          <CartIconWithBadge locale={locale} />
         </div>
       </div>
     </header>
