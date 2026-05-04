@@ -48,6 +48,7 @@
   "checkout.confirmation.heading": "{orderNumber} буйрутмасы кабыл алынды",
   "checkout.confirmation.summary_heading": "Буйрутманын чоо-жайы",
   "checkout.confirmation.view_orders": "Буйрутмаларым",
+  "checkout.conflict.stock_line": "{available} даана жеткиликтүү ({requested} керек)",
   "checkout.delivery.address_label": "Жеткирүү дареги",
   "checkout.delivery.landmark_hint": "Мисалы: №42 мектептин жанында",
   "checkout.delivery.recipient_label": "Алуучу",

@@ -48,6 +48,7 @@
   "checkout.confirmation.heading": "Order {orderNumber} placed",
   "checkout.confirmation.summary_heading": "Order details",
   "checkout.confirmation.view_orders": "My orders",
+  "checkout.conflict.stock_line": "{available} available of {requested} requested",
   "checkout.delivery.address_label": "Delivery address",
   "checkout.delivery.landmark_hint": "E.g. opposite school №42",
   "checkout.delivery.recipient_label": "Recipient",

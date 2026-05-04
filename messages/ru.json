@@ -48,6 +48,7 @@
   "checkout.confirmation.heading": "Заказ {orderNumber} принят",
   "checkout.confirmation.summary_heading": "Детали заказа",
   "checkout.confirmation.view_orders": "Мои заказы",
+  "checkout.conflict.stock_line": "Доступно {available} из {requested}",
   "checkout.delivery.address_label": "Адрес доставки",
   "checkout.delivery.landmark_hint": "Например: напротив школы №42",
   "checkout.delivery.recipient_label": "Получатель",
