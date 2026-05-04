@@ -6,11 +6,11 @@
 
 ## Current state
 
-- **Active phase:** Phase 10 — Order History & Detail _(next; not yet started)_
-- **Status:** Phase 9 complete and tagged v0.9.0. Phase 10 will build the customer-facing order history list at `/[locale]/orders` and the per-order detail page extension (the confirmation page from 9E becomes the seed; status timeline + cancel + reorder layer on top).
+- **Active phase:** Phase 10 — Order History & Detail _(complete; tagged v0.10.0)_
+- **Status:** Phase 10 complete and tagged v0.10.0. Customer-facing order list at `/[locale]/orders` (page-based pagination, hard-gated by middleware), order detail extension layered onto the 9E confirmation page (StatusTimeline + DeliveryBlock + OrderItemsBlock + cancel + reorder), Q-12 polling wired (60s while non-terminal, off in background, off on terminal).
 - **Last session:** 2026-05-04
-- **Sub-phases done:** Phase 0–8 + Phase 9A–9F (checkout). Phase 9 ships `lib/checkout/{schema,use-quote,mutations}.ts` (OP-13 throw-loudly contract held at 9A grep gate; zero catch blocks across the entire `lib/checkout/*` surface); `lib/observability/trace.ts` (Sentry breadcrumb stub); five section components (`Delivery`/`Payment`/`Recipient`/`Notes`Section + `ConflictBanner`); `AddressPicker` + `ReviewBlock`; `CheckoutForm` orchestrator with the seven-branch ORDER MATTERS conflict-resolution sequence; `/[locale]/checkout/page.tsx` with page-level empty-cart guard (per plan D3); `/[locale]/orders/[orderNumber]/page.tsx` with 3-attempt retry-fallback + success-framing fallback per plan vigilance directive #4. 28 new i18n keys × 3 (161 × 3 parity). 12 new test cases (6 idempotency-lifecycle / 7 schema / 2 ConflictBanner / 3 PaymentMethodSection regression-guard). All Phase 9 gates green.
-- **Next session should:** read `FRONTEND_CLAUDE_CODE_PROMPTS.md §Phase 10`, re-read `FRONTEND_BLUEPRINT §13` (orders) + `DESIGN_BLUEPRINT §12.10` (order list / detail / status timeline) + `PRODUCT_BLUEPRINT §F-ORD-*`. Fetch backend `app/api/v1/orders.py`, `app/domain/orders/order_service.py`, `app/domain/orders/schemas.py` (OrderListItem, OrderRead, OrderStatusRead, ReorderResponse). Then post a Phase 10 plan covering: `/[locale]/orders` list (paged); status timeline component; cancel-order flow with Dialog confirmation; reorder flow that pipes the snapshot back into the cart. **Critical reminders per CLAUDE.md sacred-invariants: order numbers always in `--text-mono` with PH- prefix; snapshot fields are immutable — display whatever the API returns, never refetch product detail to override.** No code until plan is approved.
+- **Sub-phases done:** Phase 0–9 + Phase 10A–10F. Phase 10A: `lib/orders/{lifecycle,queries,mutations}.ts` + `<OrderNumber>` (sacred-invariant #5 centralization). 10B: `<OrderListRow>` + `<StatusPip>` + `<OrderListPagination>` + `/[locale]/orders/page.tsx`. 10C: `<StatusTimeline>` + `<OrderItemsBlock>` + `<DeliveryBlock>` + detail page extension (9E success-framing fallback retained per D9). 10D: `<CancelOrderDialog>` (shadcn AlertDialog; hard-prohibition #16) + `useCancelOrder` mutation + setQueryData splice for instant timeline update. 10E: `<ReorderButton>` + `useReorder` with locked invalidate-then-push sequence (Phase 8 D12 R-C echo) + classifyReorder helper for full / partial / empty toast outcomes. 10F: full verification gate green; v0.10.0 tagged + pushed. **49 new i18n keys × 3 locales (161 → 210 parity).** **OP-13 grep gate held end-to-end** — zero catch blocks across `lib/orders/*` (matches Phase 9 strictness). **Snapshot-immutability invariant verified** — `OrderItemsBlock` renders `product_name_snapshot` / `unit_price` verbatim, zero PDP refetch (test-locked).
+- **Next session should:** read `FRONTEND_CLAUDE_CODE_PROMPTS.md §Phase 11`, re-read `FRONTEND_BLUEPRINT §17 (perf)` + `DESIGN_BLUEPRINT §16 (a11y)` + `PRODUCT_BLUEPRINT §22.7 (analytics)`. Phase 11 hardening covers: SEO (`generateMetadata` for every route + `robots.txt` + `sitemap.xml` + canonical / hreflang sweep), perf (Lighthouse ≥90 on / and PDPs; Web Vitals), a11y (axe-core sweep + keyboard nav audit), Sentry SDK wiring (replaces the `lib/observability/trace.ts` stub), ImageCarousel polish if needed. No code until plan is approved.
 
 ---
 
@@ -26,7 +26,7 @@
 - [x] Phase 7 — PDP & Search _(done 2026-05-04; v0.7.0)_
 - [x] Phase 8 — Cart _(done 2026-05-04; v0.8.0)_
 - [x] Phase 9 — Checkout & Order Placement _(done 2026-05-04; v0.9.0)_
-- [ ] Phase 10 — Order History & Detail _(next — plan pending)_
+- [x] Phase 10 — Order History & Detail _(done 2026-05-04; v0.10.0)_
 - [ ] Phase 11 — Hardening: SEO, Perf, A11y
 - [ ] Phase 12 — Storefront Launch Readiness
 - [ ] Phase A1 — Admin Foundation & Login _(parallel after Phase 5)_
@@ -306,6 +306,69 @@ pnpm e2e --project chromium --grep-invert @requires-backend
 # Tests + gate:
 pnpm test --run                     # 24 files / 179 tests passing + 1 skipped
 pnpm e2e --project chromium --grep-invert @requires-backend   # CI gate (no backend)
+```
+
+### After Phase 10 — order history + detail (J-02 partial)
+
+> **Backend prereqs unchanged from Phase 9.** Same Phase 8 smoke fixture (in-stock at branch_id=1) required to place a real order during the smoke. After Phase 9 you have at least one order on the user; Phase 10 verifies it surfaces correctly.
+
+```bash
+# Manual smoke (storefront on :3000, backend with fixture applied):
+pnpm dev
+
+# Place at least one order via the J-01 flow first (Phase 9 smoke).
+# Auth state: a user logged in via OTP with a placed order.
+
+# /ru/orders → renders the list with at least one row
+#   - Order number in `--text-mono` with PH- prefix (sacred-invariant #5)
+#   - Status pip with localized label
+#   - Total in tabular-nums sap-formatted (1 250 сом)
+#   - placed_at date in DD.MM.YYYY (ru/ky) / DD/MM/YYYY (en)
+#   - Whole row is a Link to /ru/orders/<order_number>
+# Click the row → /ru/orders/PH-<num>
+#   - Header with confirmation icon + monospace order number + StatusPip
+#   - <StatusTimeline> renders the spine: pending → confirmed → preparing
+#     → out_for_delivery → delivered (delivery method) OR
+#     pending → confirmed → preparing → ready_for_pickup → delivered (pickup)
+#   - <DeliveryBlock> renders recipient name + +996-formatted phone +
+#     joined address parts (delivery only) + customer notes
+#   - <OrderItemsBlock> renders snapshot lines + totals (subtotal +
+#     delivery_fee + total)
+#   - <CancelOrderButton> visible iff status ∈ {pending, confirmed}
+#   - <ReorderButton> visible iff status ∈ {delivered, cancelled, refunded}
+# Click cancel → AlertDialog opens (NOT confirm() — sacred-invariant #16
+#   verified by inspecting the trigger element in DevTools)
+#   - Confirm fires POST /me/orders/<num>/cancel
+#   - Timeline updates instantly (cache splice via setQueryData)
+#   - Order list invalidated; on next visit shows cancelled
+# Click reorder on a delivered order → POST /me/orders/<num>/reorder
+#   - Toast surface: full / partial / empty per response.lines[]
+#   - Cart query invalidates BEFORE router.push — destination /ru/cart
+#     renders the merged cart immediately on first paint, no flash
+# Polling cadence: leave a non-terminal order detail page open for 60s
+#   - Network tab shows GET /me/orders/<num> firing every 60s while non-terminal
+#   - Switch to a different tab → polling pauses (refetchIntervalInBackground=false)
+#   - Order reaches delivered → polling stops
+
+# Empty state path:
+# Use a fresh user with no orders → /ru/orders → friendly EmptyState
+#   with "Перейти к покупкам" → /ru/categories
+
+# E2E (CI gate, no backend):
+pnpm e2e --project chromium --grep-invert @requires-backend
+# → 13 passed, 1 skipped (account-gate covers /orders hard-gate; the
+#   redirect→/auth/otp regression net protects Phase 5 D4 across phases)
+
+# Tests + gate:
+pnpm test --run                # 34 files / 255 tests + 1 skipped
+pnpm typecheck                 # 0
+pnpm lint                      # 0
+pnpm i18n:check                # 210 × 3 parity
+pnpm build:ci                  # 0
+docker build -t nookat-storefront:phase10 .
+docker run -d --rm -p 3000:3000 --name nookat-test nookat-storefront:phase10
+sleep 5 && curl -s localhost:3000/api/health  # → {"status":"ok","version":"0.1.0"}
+docker stop nookat-test
 ```
 
 ### After Phase 12 — launch readiness

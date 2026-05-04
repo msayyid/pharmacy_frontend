@@ -63,9 +63,14 @@ export type PlaceOrderAddress = components["schemas"]["PlaceOrderAddress"]
 export type PlaceOrderRequest = components["schemas"]["PlaceOrderRequest"]
 export type PlaceOrderResponse = components["schemas"]["PlaceOrderResponse"]
 export type OrderRead = components["schemas"]["OrderRead"]
+export type OrderItemRead = components["schemas"]["OrderItemRead"]
+export type OrderStatusHistoryRead = components["schemas"]["OrderStatusHistoryRead"]
 export type OrderListItem = components["schemas"]["OrderListItem"]
+export type OrderListPage = components["schemas"]["Page_OrderListItem_"]
 export type OrderStatusRead = components["schemas"]["OrderStatusRead"]
+export type CancelOrderRequest = components["schemas"]["CancelOrderRequest"]
 export type ReorderResponse = components["schemas"]["ReorderResponse"]
+export type ReorderResponseLine = components["schemas"]["ReorderResponseLine"]
 
 // ---------------------------------------------------------------------------
 // openapi-fetch path-map (used by the typed client factories)

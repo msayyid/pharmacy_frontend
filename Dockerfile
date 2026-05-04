@@ -10,6 +10,16 @@ RUN corepack enable && corepack prepare pnpm@10.33.2 --activate
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# Build-time env stubs — KEEP IN SYNC with scripts/build-ci.sh and
+# .github/workflows/ci.yml top-level env block. lib/env/server.ts
+# Zod-parses these at module import; missing values crash `next build`'s
+# page-data collection. Real prod values come from the deploy environment
+# (Coolify) at runtime. Phase 10 close: added so `docker build` mirrors
+# the build:ci contract.
+ENV NEXT_PUBLIC_API_URL=http://localhost:8000 \
+    NEXT_PUBLIC_DEFAULT_LOCALE=ru \
+    NEXT_PUBLIC_ENV=test \
+    API_URL=http://localhost:8000
 RUN pnpm build
 
 FROM node:20-alpine AS runtime
