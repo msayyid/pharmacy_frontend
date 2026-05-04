@@ -214,3 +214,53 @@
 **Reversibility.** Most decisions are easy: the route handlers, refresh flow, providers, and inputs are all swap-in-place. The middleware composition is moderate (touches the entry point of every request). The unflatten fix is trivially reversible if next-intl ever ships flat-key support — delete `i18n/unflatten.ts`, drop the conversion call in `i18n/request.ts`. The cart-merge workaround is the marquee item to delete when the backend lands `POST /api/v1/cart/merge` (OQ-16).
 
 **References.** `FRONTEND_BLUEPRINT §8 (auth & sessions)`, `§9.1 (routing)`, `§12 (forms)`; `DESIGN_BLUEPRINT §13.3 (phone input)`, `§13.5 (OTP input)`, `§12.10 (account pages)`; `PRODUCT_BLUEPRINT §8.1 / §8.3` (auth + addresses); `FRONTEND_CLAUDE_CODE_PROMPTS §Phase 5`; backend `app/api/v1/auth.py`, `app/api/v1/account.py`, `app/domain/identity/*`, `app/core/security.py`. Phase 5 plan in chat 2026-05-03.
+
+---
+
+### 2026-05-04 — Phase 6: Catalog Browse (read-only)
+**Phase:** 6
+**Context.** Phase 6 stitches the storefront chrome (Header / Footer / MobileMenu) with the homepage RSC + categories index + category detail (grid folded in per Q2) + symptoms index + symptom landing + about page + cart placeholder. All read-only; no add-to-cart action wired (Phase 8 owns the cart). 41 new i18n keys; URL-driven Pagination + SortSelect; ProductCard skeleton-to-shipped; ProductImage wrapper centralizes the brand-pill fallback; locale-plumbing fix lands in `lib/api/server.ts`.
+
+**Decisions.**
+
+- **D1 — Hero CTA → `/[locale]/categories`** (not `/search`). Working CTA at phase close > aspirational broken CTA. Phase 7 retargets when the search route renders properly. Confirmed by user.
+
+- **D2 — Grid breakpoints.** Product grid 4-up desktop / 2/3-up tablet / 1-up phone (matches DESIGN §12.4); symptom tile grid 2/3/4-up; category card grid 1/2/3-up on the homepage's featured strip. ProductImage forces a 1:1 square aspect ratio so the grid stays even regardless of source image dimensions.
+
+- **D3 — Page-numbered pagination, 24/page, URL-driven.** State lives in `?page=N`; Pagination renders <Link> hrefs that preserve `?sort` (the parent's `buildHref(page)` callback). 7-button window with first/last + ±2 neighbours + ellipsis when there's a gap. Returns null when totalPages ≤ 1 — no chrome on a one-page list. Confirmed by user.
+
+- **D4 — Sort-only filter rail at MVP.** Filter sheet/drawer is Phase 11 hardening per the prompt's out-of-scope list. SortSelect (Radix shadcn Select, client) writes `?sort=<value>`; resets `?page` to 1 on sort change to avoid mid-list surprises; default value `relevance` drops the query param for canonical URLs. Four options (`relevance | price_asc | price_desc | name_asc`) match the backend's accepted set.
+
+- **D5 — Disabled "Add to cart" CTA, no tooltip.** Confirmed by user. Disabled state alone is universal e-commerce language; "Скоро" tooltip would create expectation drift and an i18n key we'd remove next phase. The CTA stays enabled-styled when in-stock (Phase 8 wires the click handler) and swaps to a localized OOS label ("Нет в наличии") with disabled styling when out-of-stock — both states are rendered as `<button disabled>`.
+
+- **D6 — `in_stock_only=true` matches backend default.** All 5 seeded products are currently `is_in_stock=false` (inventory levels not populated until admin Phase A1+), so every category list-page legitimately renders the EmptyState. This is the "empty-state path verified for real" outcome the user accepted in Q5; populated-data verification re-runs at Phase 8 close.
+
+- **D7 — Brand-pill fallback for product images, distinct from category/symptom icon fallback.** ProductImage uses `PillIcon` over a brand-50 wash for null `thumbnail_url`. CategoryCard uses `FolderIcon`; SymptomTile uses `ActivityIcon`. Three different fallback shapes for three different surfaces, each visually distinct so a missing-image surface doesn't read as "everything is missing the same way."
+
+- **D8 — Header chrome at Phase 6.** Cart icon renders as 0-state (no badge); Phase 8 wires the live count. Account icon is auth-aware via `next/headers cookies()` server-side — logged-in users get `/account`, guests get `/auth/otp?return=…`. No client hydration. Search icon (mobile) + search input stub (desktop) link to `/[locale]/search` placeholder until Phase 7 fills it.
+
+- **D9 — Per-surface `next.revalidate` windows in `lib/api/catalog.ts`** matching FRONTEND §15.2: categories tree 5m, category detail 1m, category products 30s, symptoms 5m, symptom products 30s, branches 1h. RSC pages call these helpers; per-page Next data cache holds responses for the configured window.
+
+- **D10 — Server-side fetcher reads Accept-Language from URL, not browser header.** Surfaced during 6B smoke when `/ky/...` returned Russian content. Root cause: `createServerApiClient` was forwarding the inbound browser `Accept-Language` (often empty in curl, `en-US` in default Playwright), but the backend's locale resolver reads only Accept-Language. URL-segment locale is the source of truth; we override the header explicitly on every catalog call. Implementation: `createServerApiClient(locale?: string)` accepts an optional locale; `lib/api/catalog.ts` threads it through. (D11 is the same idea worded as a fix — keeping both for traceability.)
+
+- **D11 — Catalog fetchers take `locale` as the first argument.** Every helper signature in `lib/api/catalog.ts` puts `locale` first so call sites read consistently. Pages pass it from the dynamic `[locale]` route segment. The fetcher constructs a per-call `createServerApiClient(locale)` so cross-request bleed isn't possible.
+
+- **D12 — i18n keys: 41 new across 8 families.** `nav.* / home.* / category.* / symptom.* / branch.* / footer.* / pagination.* / product.add_to_cart`. Total now 101 × 3 locales. KY translations curated for the new families; EN seeded with English copy. Pre-launch backlog item for KY pharmacist review still applies (Q-9).
+
+- **D13 — Branches/About at `/[locale]/about` (not `/[locale]/branches`).** Matches the prompt §6.4.6 + footer column 2 link target. Renders both seeded branches even though Q-1 says single-branch UX — operator sees "we have an Asanbay branch and a Central branch in Bishkek" which is correct given the seed, even if the brand identity is "Nookat in Nookat" geographically.
+
+- **D14 — Symptom landing breadcrumb is inline, not via `Breadcrumb` component.** The CategoryDetail breadcrumb shape (`{id, slug, name}[]`) doesn't match the symptom flow's parents (Home → Symptoms → <name>). A 30-line inline breadcrumb is cheaper than generalizing the Breadcrumb component prematurely. If a third breadcrumb-shaped flow appears (e.g., orders → order detail), revisit.
+
+- **D15 — Symptom name resolution via list-then-find.** Backend has no `GET /api/v1/symptoms/{slug}` detail route (OQ-18). The symptom landing page fetches the full symptoms list (cheap, cached 5m) and looks the slug up in JS. notFound() when slug doesn't match. When backend exposes a detail route, swap to a single GET.
+
+**Side findings.**
+
+- **R-A held (fourth time).** Header rendering fully-server with only the MobileMenu sheet trigger as a client island worked cleanly; build-exit-code is sufficient verification because the Header uses server-only APIs (`cookies()`, `getTranslations()`) that would fail compilation in a client component.
+- **R-D was a frontend bug, not backend.** The user's Phase 6 plan flagged R-D as "if KY page returns Russian, that's a real backend bug — escalate." The bug turned out to live in `lib/api/server.ts` (wrong Accept-Language source). Backend correctly serves `?lang=ky` / `Accept-Language: ky`. Logged here so a future "backend doesn't honor Accept-Language" report doesn't get framed as a backend issue without first checking the FE plumbing.
+- **OQ-22 self-resolved.** During the early 6B smoke `GET /api/v1/categories` returned `[]` despite 6 active rows. After a fresh dev-server start the endpoint began returning the 6 root categories with full Cyrillic. No backend fix applied. Most likely a `cache_get_or_set` race that cached an empty-array value during the seed window. Logged as a recommended audit before launch.
+- **Test infrastructure: server-component testing via `getTranslations` mock.** RSC components that call `await getTranslations()` from `next-intl/server` cannot be tested directly in jsdom — the function refuses to run outside RSC context. Workaround: `vi.mock("next-intl/server", () => ({ getTranslations: vi.fn().mockImplementation(async () => (key) => dict[key] ?? key) }))` then `await import` the component. This pattern is reused across `product-card.test.tsx` and `pagination.test.tsx` and is the recommended approach for any future RSC component test.
+- **Empty-state correctness covered better than populated-state correctness.** Because all seeded products are out-of-stock (inventory levels not populated until admin Phase A1+), Phase 6 verified the empty-state code path more thoroughly than the populated path. ProductCard's in-stock variant is unit-tested but not e2e-rendered against real data. Re-verification re-runs at Phase 8 close when admin can seed inventory.
+
+**Reversibility.** All decisions are component-local and easily revisited. The biggest "chunk" is the locale plumbing in `lib/api/server.ts` + `lib/api/catalog.ts` — if next-intl or the backend ever standardize on a different locale-resolution channel, the change is centralized in those two files.
+
+**References.** `DESIGN_BLUEPRINT §11.3 / §12.1-§12.5 / §8.4`; `FRONTEND_BLUEPRINT §6 / §15.2 / §22`; `PRODUCT_BLUEPRINT §5 / §7.1 / §8.2 / §12 (Search & Discovery — note: spec calls this §12, not §17 as the original prompt cited)`; `FRONTEND_CLAUDE_CODE_PROMPTS §Phase 6`; backend `app/api/v1/{categories,symptoms,branches}.py`, `app/domain/catalog/storefront.py`, `app/domain/catalog/storefront_schemas.py`. Phase 6 plan in chat 2026-05-04.

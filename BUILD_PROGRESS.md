@@ -6,11 +6,11 @@
 
 ## Current state
 
-- **Active phase:** Phase 6 — Catalog Browse _(awaiting plan)_
-- **Status:** Phase 5 complete; Phase 6 plan due before any Phase 6 code.
-- **Last session:** 2026-05-03
-- **Sub-phases done:** Phase 0 (master plan); Phase 1A-1F (Next.js 16 foundation); Phase 2A-2F (brand tokens + shadcn-Radix + composed-component skeletons + kitchen-sink); Phase 3A-3F (typed openapi-fetch client + ApiError + RSC/client fetchers + auth stubs + diagnostic route + CI types-check); fix(ci) post-Phase-3 (build-time env injection in CI workflow + `pnpm build:ci` script + CLAUDE.md amendments around the false-green local gate); Phase 4A-4F (next-intl@4.11 + locale-prefixed `[locale]/...` routing + middleware locale detection + 50-key `messages/{ru,ky,en}.json` with backend dotted-flat parity + locale-aware formatters in `lib/format/{price,date,number,phone}.ts` + LangSwitcher + i18n:check CI gate + 31 new tests); Phase 5A-5F (auth route handlers in `app/api/auth/*` + single-flight refresh + Zustand auth store + return-URL sanitizer + cart-merge sequential workaround + PhoneInput + OtpInput + `/[locale]/auth/otp` + `/[locale]/account` + `/[locale]/account/addresses` CRUD + middleware composing next-intl with auth gate + AppProviders + 123 unit/component tests + 14 e2e tests + i18n unflatten fix surfaced via the Playwright web-server log). All Phase 5 gates green; v0.5.0 tagged.
-- **Next session should:** read `FRONTEND_CLAUDE_CODE_PROMPTS.md §Phase 6`, re-read `FRONTEND_BLUEPRINT §6 (route map)`, `§9.2-§9.4 (catalog routes)`, `§13 (data fetching patterns)`, `DESIGN_BLUEPRINT §11.1-§11.5 (product card / category list / symptom tiles)`, `PRODUCT_BLUEPRINT §16 (catalog browse)`. Fetch backend `app/api/v1/catalog.py`, `app/api/v1/categories.py`, `app/api/v1/symptoms.py`, `app/api/v1/branches.py`. Then post a Phase 6 plan covering: home page (RSC; symptom tiles + featured categories + "near you" branch picker stub); category index `/[locale]/c`; category detail `/[locale]/c/[slug]`; symptom tile click-through to filtered category list; branch picker placeholder per Q-6 deferral; product card (Phase 2 skeleton); empty/error states. No code until plan is approved.
+- **Active phase:** Phase 7 — PDP & Search _(awaiting plan)_
+- **Status:** Phase 6 complete; Phase 7 plan due before any Phase 7 code.
+- **Last session:** 2026-05-04
+- **Sub-phases done:** Phase 0–5 (master plan / foundation / design system / typed API client / i18n / auth + account); Phase 6A–6F (catalog browse). Phase 6 ships the storefront chrome (Header / Footer / MobileMenu) + homepage RSC (Hero / symptom grid / featured categories / TrustStrip) + categories index + category detail with grid folded in (Q2) + symptoms index + symptom landing + about page + cart placeholder + URL-driven Pagination + SortSelect + ProductCard (default variant) + ProductImage wrapper. 41 new i18n keys (101 × 3). 16 backend asks logged as OQ-17–OQ-22 across two batches (Phase 6 plan-derived + smoke-derived). All Phase 6 gates green; v0.6.0 tagged.
+- **Next session should:** read `FRONTEND_CLAUDE_CODE_PROMPTS.md §Phase 7`, re-read `DESIGN_BLUEPRINT §12.6 (PDP)`, `§15 (trust signals)`, `§8.3 (product photography)`, `FRONTEND_BLUEPRINT §10 (data fetching)` + `§16 (image handling)`, `PRODUCT_BLUEPRINT §F-CAT-003 (PDP)` + `§F-CAT-008 (search)`. Fetch backend `app/api/v1/products.py`, `app/api/v1/search.py`, `app/domain/catalog/storefront_schemas.py` (StorefrontProductDetail, SearchResultPage, SuggestResponse), `app/domain/catalog/search.py`. Then post a Phase 7 plan covering: PDP at `/[locale]/products/[slug]` (RSC, generateMetadata, ImageCarousel, description tabs/accordion, ActiveIngredientChip row, SubstitutesBlock with Suspense), search at `/[locale]/search` (RSC + searchParams), SearchInput + SearchSuggest (client, debounced 250ms), search empty-state + synonym chip row. Phase 7 also retargets the homepage hero CTA from `/categories` → `/search` once the search route renders properly. No code until plan is approved.
 
 ---
 
@@ -22,8 +22,8 @@
 - [x] Phase 3 — API Client + Type Generation _(done 2026-05-03; v0.3.0)_
 - [x] Phase 4 — i18n Foundation _(done 2026-05-03; v0.4.0)_
 - [x] Phase 5 — Auth & Account _(done 2026-05-03; v0.5.0)_
-- [ ] Phase 6 — Catalog Browse (read-only) _(active — plan pending)_
-- [ ] Phase 7 — PDP & Search
+- [x] Phase 6 — Catalog Browse (read-only) _(done 2026-05-04; v0.6.0)_
+- [ ] Phase 7 — PDP & Search _(active — plan pending)_
 - [ ] Phase 8 — Cart
 - [ ] Phase 9 — Checkout & Order Placement
 - [ ] Phase 10 — Order History & Detail
@@ -132,6 +132,74 @@ pnpm dev
 pnpm e2e --project chromium --grep @requires-backend
 # → tests/e2e/auth-flow.spec.ts: 2 passed
 # Receipts from this run go in the phase-close summary alongside unit/component/CI green output.
+```
+
+### After Phase 6 — catalog browse live
+
+> **Backend prerequisites (per the Phase 5 recipe + a one-time seed):**
+>
+> ```bash
+> # Already done in Phase 5: docker-up + migrate + dev. If starting fresh:
+> brew services stop mysql 2>/dev/null
+> cd ../pharmacy_backend && make docker-up && make migrate
+>
+> # Phase 6 needs catalog data. The make-target points at a non-existent
+> # module (OQ-19) so invoke the seed scripts directly with the
+> # mapper-preload workarounds (OQ-20):
+> uv run python -c "
+> import app.domain.identity.models  # noqa: F401  -- preload AdminUser
+> import asyncio
+> from dev.fixtures.catalog.seed import main
+> asyncio.run(main())
+> "
+> uv run python -c "
+> import app.domain.identity.models  # noqa: F401
+> import app.domain.orders.models     # noqa: F401  -- preload orders FK
+> import asyncio
+> from dev.fixtures.inventory.seed import main
+> asyncio.run(main())
+> "
+>
+> make dev 2>&1 | tee /tmp/backend.log
+> ```
+>
+> Seeded catalog: 7 manufacturers, 6 categories (4 root + 2 children of Vitamins), 5 symptoms, 5 ingredients, 5 products, 2 branches, 7 batches. All translations in RU/KY/EN (some KY/EN gaps acknowledged per Q-9 pre-launch review). All 5 products are currently `is_in_stock=false` until inventory levels get populated (post-MVP via admin Phase A1+).
+
+```bash
+# Manual smoke (storefront on :3000, backend on :8000, seeded as above):
+pnpm dev
+
+# /ru → renders Hero + symptom grid (5 tiles in Cyrillic) + featured
+#   categories grid (4 root cats) + TrustStrip + Footer
+# Click hero CTA "Найти лекарства" → lands on /ru/categories
+# Click a category card → /ru/categories/<slug> with breadcrumb +
+#   description + EmptyState (in_stock_only=true filters everything out)
+# /ru/categories/vitamins → also shows sub-cats (Витамин C, Поливитамины)
+# /ru/symptoms → 5 symptom tiles
+# Click a tile → /ru/symptoms/<slug> with name + EmptyState (no
+#   product-symptom links in current seed)
+# /ru/about → 2 branch cards (Аптека Асанбай / Центральная), license,
+#   trust strip
+# /ru/cart → friendly EmptyState (Phase 8 wires real cart)
+
+# Locale verification (R-D):
+# /ky → Kyrgyz where seed has KY translations (Витаминдер / Баш ооруу /
+#   Жогорку температура / Сууктоо / etc.); RU fallback for the symptoms
+#   missing KY translations in the seed (muscle-pain, heartburn) per
+#   backend _pick_translation design (PRODUCT §13.1 RU canonical)
+# /en → English fully
+
+# E2E (backend up + seeded):
+pnpm e2e --project chromium --grep @requires-backend tests/e2e/catalog-flow.spec.ts tests/e2e/symptom-flow.spec.ts
+# → 10 passed (5 catalog + 5 symptom flow tests covering chrome render,
+#    category navigation, symptom navigation, KY locale verification,
+#    about-page branch rendering, empty-state path)
+
+# CI gate (no backend):
+pnpm e2e --project chromium --grep-invert @requires-backend
+# → 13 passed, 1 skipped (Phase 4 + Phase 5 + Phase 6 specs that don't
+#    need a backend; the `@requires-backend` Phase 5 + Phase 6 specs are
+#    filtered out)
 ```
 
 ### After Phase 9 — full J-01 (first-time symptom shopper)
