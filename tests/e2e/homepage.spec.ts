@@ -1,7 +1,5 @@
 import { test, expect } from "@playwright/test"
 
-import { BRAND } from "@/lib/brand"
-
 test("homepage at / redirects to a locale-prefixed URL", async ({ page }) => {
   // Phase 4 (D1): the next-intl middleware redirects `/` → `/<locale>` where
   // <locale> is negotiated from Accept-Language (`localeDetection: true`).
@@ -11,12 +9,15 @@ test("homepage at / redirects to a locale-prefixed URL", async ({ page }) => {
   const response = await page.goto("/")
   expect(page.url()).toMatch(/\/(ru|ky|en)\/?$/)
   expect(response?.status()).toBe(200)
-
-  await expect(page).toHaveTitle(/foundation phase/i)
   await expect(page.locator("html")).toHaveAttribute("lang", /ru|ky|en/)
-  await expect(page.locator("h1")).toContainText(BRAND.name)
-  await expect(page.getByText("Foundation phase complete")).toBeVisible()
-  await expect(page.getByText("Build version 0.1.0")).toBeVisible()
+
+  // Phase 6: header chrome is present on every storefront route. The "Cart"
+  // and "Categories" labels are localized, so we assert via the link's
+  // href which is locale-stable (matches /<locale>/cart, /<locale>/categories).
+  await expect(page.locator("header a[href$='/cart']")).toBeVisible()
+  await expect(page.locator("header a[href$='/categories']").first()).toBeVisible()
+  // Phase 6: footer rendered on the homepage (sticky-bottom pattern).
+  await expect(page.locator("footer")).toBeVisible()
 })
 
 test("/ru direct request lands on /ru with html lang=ru", async ({ page }) => {

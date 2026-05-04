@@ -5,6 +5,8 @@ import { getMessages } from "next-intl/server"
 import { notFound } from "next/navigation"
 
 import { AppProviders } from "@/app/providers"
+import { Footer } from "@/components/layout/Footer"
+import { Header } from "@/components/layout/Header"
 import { BRAND } from "@/lib/brand"
 import { locales } from "@/i18n/config"
 import "../globals.css"
@@ -47,6 +49,11 @@ interface LocaleLayoutProps {
 // have access to TanStack Query, next-intl, and Radix Tooltip context.
 // The provider lives in app/providers.tsx ("use client") and is mounted
 // here from this Server Component.
+//
+// Phase 6 (6A): mounts <Header /> + <Footer /> as RSC siblings of the
+// route content. Both components render server-side; only the mobile menu
+// trigger inside Header is a client island (R-E mitigation). The body
+// becomes a flex column so the footer hugs the bottom on short pages.
 export default async function LocaleLayout({ children, params }: LocaleLayoutProps) {
   const { locale } = await params
   if (!hasLocale(locales, locale)) notFound()
@@ -58,9 +65,11 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
       lang={locale}
       className={`${inter.variable} ${jetbrainsMono.variable} ${dmSerif.variable}`}
     >
-      <body>
+      <body className="bg-surface-app text-ink-900 flex min-h-screen flex-col antialiased">
         <AppProviders locale={locale} messages={messages}>
-          {children}
+          <Header locale={locale} />
+          <main className="flex-1">{children}</main>
+          <Footer locale={locale} />
         </AppProviders>
       </body>
     </html>

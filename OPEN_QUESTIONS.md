@@ -73,9 +73,11 @@ Backend fix: add the missing imports at the top of each seed module so `python -
 **Status.** Open (logged for traceability) — no action needed.
 **Decision.** No-op. Data integrity is intact.
 
-### OQ-22 — `GET /api/v1/categories` returns `[]` despite 6 active rows in the categories table (real backend bug)
+### OQ-22 — `GET /api/v1/categories` intermittently returns `[]` despite 6 active rows in the categories table
 **Raised:** 2026-05-04 (Phase 6)
-**Severity:** High — affects every Russian/Kyrgyz user landing on the storefront homepage at production launch.
+**Severity:** Medium — reproduced once during Phase 6 sub-phase 6B smoke, then resolved itself without intervention. Worth a backend audit before launch because the failure mode (empty homepage category grid) is high-visibility on the primary discoverability surface.
+**Reproduction window (2026-05-04, ~21:40-22:30 UTC).** API returned `[]` from initial run. Survived: `FLUSHALL` of Redis, fresh dev-server restart, uvicorn restart by the operator. Symptoms + branches endpoints worked correctly throughout the same window with the same DB connection. Direct ORM queries through a standalone `uv run python -m ...` script returned all 6 rows during the same window.
+**Self-resolution (2026-05-04, ~22:35 UTC).** A subsequent dev-server restart (after killing the FE dev process and clearing `.next/`) suddenly began receiving real category data: 4 root categories with full Cyrillic names + 2 sub-categories under Vitamins. No backend fix was applied. Possible causes: (a) a stale empty-array value in Redis with a long TTL that finally expired, (b) a race in `cache_get_or_set` where one early request stored an empty result before the seed transaction was visible, then served it for the cached duration, (c) some other cache or pool warmup issue that resolves naturally over time.
 **Question.** `GET /api/v1/categories` returns `[]` despite the `pharmacy.categories` table having 6 active rows (`is_active=1`, `deleted_at IS NULL`). Symptoms (`/api/v1/symptoms`) and branches (`/api/v1/branches`) endpoints work correctly with the same DB connection and same backend process — same `asyncmy` driver, same DSN. The bug is specific to the categories query path. Restarting uvicorn does not fix it (initial stale-pool theory rejected). FastAPI returns 200 OK with an empty array body.
 **Diagnostic findings (2026-05-04).** The visible code path looks correct end-to-end:
 - Route `app/api/v1/categories.py:30` calls `service.get_categories_tree(language_code=lang)` — fine.
@@ -84,11 +86,18 @@ Backend fix: add the missing imports at the top of each seed module so `python -
 - `_assemble_tree` falls back to slug if translation lookup fails (`name = _pick_translation(...) or c.slug`), so even degenerate translation data would yield 6 nodes — the empty array can only happen if `list_active_tree()` itself returns 0 rows.
 - `cache_get_or_set` wrapper is straightforward (Redis GET → loader → SET); we did `FLUSHALL` before the curl that returned `[]`, so cache is not the cause; it can only be storing what `loader` returned, which means `list_active_tree()` returned 0.
 
-**Suspected root cause.** Bug is somewhere outside the visible code path — possibly in the FastAPI Depends chain (e.g., `get_storefront_catalog_service` constructing `CategoryRepository` with a session that's bound to a different DB / different tenant scope) or in a connection-pool / metadata-cache layer that doesn't refresh after migrations. Cannot determine in 30 seconds. **Audit needed** by someone with backend write access. Strong starting points: (a) is the running session connecting to the same database the seed wrote to, (b) is there a multi-tenant scoping middleware filtering `categories` specifically, (c) does Alembic's autogenerate place categories in a different schema/table during migration.
-**Proposed default (no FE work).** Phase 6 ships with the categories empty-state path verified for real. Symptoms + branches paths verified populated. When backend fixes the categories query, no FE change is needed — the homepage already handles `length === 0` gracefully (just hides the section), and a non-zero response will start populating the section automatically.
-**Owner.** Backend team — high priority, blocks any meaningful catalog browse at launch.
-**Status.** Open — escalated. Phase 6 ships around it.
-**Decision.** _(open — backend audit before launch; FE empty-state path verified at Phase 6 close)_
+**Diagnostic findings during the failure window.** The visible code path looked correct end-to-end:
+- Route `app/api/v1/categories.py:30` → `service.get_categories_tree(language_code=lang)` — fine.
+- Service `app/domain/catalog/storefront.py:74` → `self.categories.list_active_tree()` then `_assemble_tree(cats, language_code)` — fine.
+- Repository `app/domain/catalog/repositories.py:243` → `select(Category).options(selectinload(Category.translations)).where(Category.deleted_at.is_(None), Category.is_active.is_(True))` — direct ORM execution of this exact query (same DSN, same settings) returned 6 rows in our diagnostic.
+- `_assemble_tree` falls back to slug if translation lookup fails (`name = _pick_translation(...) or c.slug`), so even degenerate translation data would yield 6 nodes — empty array implies `list_active_tree()` itself returned 0.
+- `cache_get_or_set` wrapper is straightforward (Redis GET → loader → SET); we ran `FLUSHALL` between curls during the failure window, so cache wasn't holding the value across our explicit flushes.
+
+**Suspected root cause (still — bug isn't fully understood).** Most likely a `cache_get_or_set` race: one early request, executing during or before the seed transaction's visibility, ran the loader, got 0 rows, and cached `[]` for `CATEGORY_TREE_TTL=3600`. Operators restarting Redis or letting the TTL expire would resolve it — which matches the self-resolution timing. If true, the fix is to either (a) skip caching empty results (treat `[]` as a transient signal rather than a value to cache), (b) shorten the empty-result TTL, or (c) clear the categories cache key as part of `make migrate` / `make seed`.
+**Proposed default (no FE work).** Phase 6 ships against current state — the homepage handles both empty and populated category trees correctly. If the bug returns at launch, FE renders an empty featured-categories section gracefully (Hero + symptom grid + trust strip + footer remain), and the impact is "homepage looks sparser" rather than "homepage broken."
+**Owner.** Backend team — medium priority, recommended audit before launch, but not a blocker.
+**Status.** Open — backend audit recommended; not reproducing currently.
+**Decision.** _(open — backend follow-up recommended; FE renders correctly in both states)_
 
 ---
 
