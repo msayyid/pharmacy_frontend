@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import { getTranslations } from "next-intl/server"
 import { notFound } from "next/navigation"
 
@@ -9,6 +10,7 @@ import { ProductCard } from "@/components/product/ProductCard"
 import { type Locale, locales } from "@/i18n/config"
 import { hasLocale } from "next-intl"
 import { getCategoryDetail, getCategoryProducts } from "@/lib/api/catalog"
+import { getSiteUrl } from "@/lib/seo/site-url"
 
 // Category detail page — RSC. Per Phase 6 plan Q2: products grid is folded
 // in here (no separate /products sub-route). DESIGN §12.5 anatomy:
@@ -41,6 +43,33 @@ function parsePage(raw: string | undefined): number {
 
 function parseSort(raw: string | undefined): SortValue {
   return VALID_SORTS.find((s) => s === raw) ?? "relevance"
+}
+
+export async function generateMetadata({ params }: CategoryDetailPageProps): Promise<Metadata> {
+  const { locale, slug } = await params
+  const detail = await getCategoryDetail(slug, locale)
+  const siteUrl = getSiteUrl()
+  if (!detail) {
+    return {
+      alternates: {
+        canonical: `${siteUrl}/${locale}/categories/${slug}`,
+        languages: Object.fromEntries(
+          locales.map((l) => [l, `${siteUrl}/${l}/categories/${slug}`]),
+        ),
+      },
+    }
+  }
+  // Description from category if present; otherwise omit (Next falls back
+  // to layout default). Keep it under ~160 chars per SEO guidance.
+  const description = detail.description?.slice(0, 160) ?? undefined
+  return {
+    title: detail.name,
+    ...(description ? { description } : {}),
+    alternates: {
+      canonical: `${siteUrl}/${locale}/categories/${slug}`,
+      languages: Object.fromEntries(locales.map((l) => [l, `${siteUrl}/${l}/categories/${slug}`])),
+    },
+  }
 }
 
 export default async function CategoryDetailPage({

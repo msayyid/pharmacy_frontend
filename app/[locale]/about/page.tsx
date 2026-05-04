@@ -1,11 +1,14 @@
+import type { Metadata } from "next"
 import { ClockIcon, MapPinIcon, PhoneIcon } from "lucide-react"
 import { getTranslations } from "next-intl/server"
 
 import { EmptyState } from "@/components/feedback/EmptyState"
 import { TrustStrip } from "@/components/marketing/TrustStrip"
+import { locales } from "@/i18n/config"
 import { getBranches } from "@/lib/api/catalog"
 import { BRAND, type BrandLocale } from "@/lib/brand"
 import { formatPhoneDisplay } from "@/lib/format/phone"
+import { getSiteUrl } from "@/lib/seo/site-url"
 import { cn } from "@/lib/utils"
 
 // About page (/[locale]/about) — RSC. DESIGN §12.3 trust-led + §11.3
@@ -17,6 +20,20 @@ import { cn } from "@/lib/utils"
 
 interface AboutPageProps {
   params: Promise<{ locale: string }>
+}
+
+export async function generateMetadata({ params }: AboutPageProps): Promise<Metadata> {
+  const { locale } = await params
+  const t = await getTranslations({ locale })
+  const siteUrl = getSiteUrl()
+  return {
+    title: t("seo.about.title"),
+    description: t("seo.about.description"),
+    alternates: {
+      canonical: `${siteUrl}/${locale}/about`,
+      languages: Object.fromEntries(locales.map((l) => [l, `${siteUrl}/${l}/about`])),
+    },
+  }
 }
 
 export default async function AboutPage({ params }: AboutPageProps) {

@@ -1,8 +1,11 @@
+import type { Metadata } from "next"
 import { getTranslations } from "next-intl/server"
 
 import { CategoryTree } from "@/components/catalog/CategoryTree"
 import { EmptyState } from "@/components/feedback/EmptyState"
+import { locales } from "@/i18n/config"
 import { getCategoriesTree } from "@/lib/api/catalog"
+import { getSiteUrl } from "@/lib/seo/site-url"
 
 // Categories index — RSC. DESIGN §12.5 + Phase 6 6C. Renders the full
 // active tree returned by /api/v1/categories. Empty-state when the
@@ -11,6 +14,20 @@ import { getCategoriesTree } from "@/lib/api/catalog"
 
 interface CategoriesIndexPageProps {
   params: Promise<{ locale: string }>
+}
+
+export async function generateMetadata({ params }: CategoriesIndexPageProps): Promise<Metadata> {
+  const { locale } = await params
+  const t = await getTranslations({ locale })
+  const siteUrl = getSiteUrl()
+  return {
+    title: t("seo.categories.title"),
+    description: t("seo.categories.description"),
+    alternates: {
+      canonical: `${siteUrl}/${locale}/categories`,
+      languages: Object.fromEntries(locales.map((l) => [l, `${siteUrl}/${l}/categories`])),
+    },
+  }
 }
 
 export default async function CategoriesIndexPage({ params }: CategoriesIndexPageProps) {

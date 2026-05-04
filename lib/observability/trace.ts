@@ -1,15 +1,24 @@
-// Observability breadcrumb stub. Phase 1 installed @sentry/nextjs but
-// the SDK runtime is wired in Phase 11. Until then, every trace() call
-// logs to the dev console only — production builds drop the call.
+import * as Sentry from "@sentry/nextjs"
+
+import { scrubPii } from "@/lib/observability/scrub"
+
+// Observability breadcrumb. Phase 11D.
 //
-// Phase 9 + 8 use this for idempotency-key lifecycle (mint, reuse,
-// conflict, retry). The breadcrumb investment now is intended to make
-// post-incident debugging tractable: idempotency bugs are the hardest
-// class to debug from logs alone.
+// Phase 1 stub-shipped this file; Phase 11D wires the real Sentry body.
+// Consumers added across phases 8/9/10 (cart mutations, idempotency-key
+// lifecycle, order cancel/reorder) keep working unchanged: same import,
+// same call shape.
 //
-// Phase 11 swap-in: replace the body with
-//   `Sentry.addBreadcrumb({ category, message, data, level: "info" })`
-// when the SDK is initialized. Consumers don't change.
+// Without SENTRY_DSN configured (dev/CI/staging-test), the SDK init in
+// sentry.{server,edge}.config.ts + instrumentation-client.ts is a no-op,
+// and Sentry.addBreadcrumb is a no-op too. We additionally echo to the
+// dev console so dev sessions still see the lifecycle output.
+//
+// PII discipline: scrubPii runs on `data` here in addition to the
+// beforeSend filter at the Sentry boundary. Belt-and-suspenders: even
+// if a consumer accidentally passes `phone` / `email` / `address` in
+// the data payload, the breadcrumb persisted to Sentry has them
+// redacted. Sacred-invariant #8.
 
 export interface TraceContext {
   category: string
@@ -19,9 +28,16 @@ export interface TraceContext {
 }
 
 export function trace({ category, message, data, level = "info" }: TraceContext): void {
+  const scrubbedData = data ? scrubPii(data) : undefined
+  Sentry.addBreadcrumb({
+    category,
+    message,
+    level,
+    ...(scrubbedData ? { data: scrubbedData } : {}),
+  })
+
   if (process.env.NODE_ENV !== "production") {
     const consoleMethod = level === "error" ? "error" : level === "warning" ? "warn" : "debug"
-    console[consoleMethod](`[${category}] ${message}`, data ?? {})
+    console[consoleMethod](`[${category}] ${message}`, scrubbedData ?? {})
   }
-  // Phase 11: Sentry.addBreadcrumb({ category, message, data, level })
 }

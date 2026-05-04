@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import { SearchIcon } from "lucide-react"
 import { getTranslations } from "next-intl/server"
 import Link from "next/link"
@@ -10,6 +11,7 @@ import { ProductCard } from "@/components/product/ProductCard"
 import { SearchSynonymChips } from "@/components/search/SearchSynonymChips"
 import { type Locale, locales } from "@/i18n/config"
 import { getSearchResults } from "@/lib/api/catalog"
+import { getSiteUrl } from "@/lib/seo/site-url"
 import { cn } from "@/lib/utils"
 
 // Search results — RSC. DESIGN §12.12 + Phase 7 plan §7.4.4.
@@ -38,6 +40,24 @@ function parsePage(raw: string | undefined): number {
   if (!raw) return 1
   const parsed = Number.parseInt(raw, 10)
   return Number.isFinite(parsed) && parsed >= 1 ? parsed : 1
+}
+
+export async function generateMetadata({ params }: SearchPageProps): Promise<Metadata> {
+  const { locale } = await params
+  const t = await getTranslations({ locale })
+  const siteUrl = getSiteUrl()
+  // Search results are query-driven and not stable canonical surfaces; we
+  // index the bare /search page (the popular-searches landing) but ask
+  // crawlers not to index `?q=...` permutations to avoid spam pages.
+  return {
+    title: t("seo.search.title"),
+    description: t("seo.search.description"),
+    alternates: {
+      canonical: `${siteUrl}/${locale}/search`,
+      languages: Object.fromEntries(locales.map((l) => [l, `${siteUrl}/${l}/search`])),
+    },
+    robots: { index: true, follow: true },
+  }
 }
 
 export default async function SearchPage({ params, searchParams }: SearchPageProps) {

@@ -1,16 +1,19 @@
 import type { Metadata } from "next"
 import { DM_Serif_Display, Inter, JetBrains_Mono } from "next/font/google"
 import { hasLocale } from "next-intl"
-import { getMessages } from "next-intl/server"
+import { getMessages, getTranslations } from "next-intl/server"
 import { notFound } from "next/navigation"
 
 import { AppProviders } from "@/app/providers"
 import { CartDrawer } from "@/components/cart/CartDrawer"
 import { Footer } from "@/components/layout/Footer"
 import { Header } from "@/components/layout/Header"
+import { WebVitalsReporter } from "@/components/observability/WebVitalsReporter"
 import type { Locale } from "@/i18n/config"
-import { BRAND } from "@/lib/brand"
+import { BRAND, type BrandLocale } from "@/lib/brand"
 import { locales } from "@/i18n/config"
+import { buildPageTitle } from "@/lib/seo/title"
+import { getSiteUrl } from "@/lib/seo/site-url"
 import "../globals.css"
 
 const inter = Inter({
@@ -32,14 +35,57 @@ const dmSerif = DM_Serif_Display({
   display: "swap",
 })
 
-export const metadata: Metadata = {
-  title: `${BRAND.name} — foundation phase`,
-  description: `${BRAND.name} storefront foundation phase. See BUILD_PROGRESS.md for the active phase.`,
-}
-
 interface LocaleLayoutProps {
   children: React.ReactNode
   params: Promise<{ locale: string }>
+}
+
+// Phase 11B — locale-aware layout metadata. The Phase 4 placeholder
+// ("foundation phase") is retired. Template title pattern (`%s | Ноокат`)
+// applies to every child route via Next's metadata composition: routes
+// that set metadata.title with `{ template, default }` win at the page
+// level; otherwise children inherit the home defaults.
+//
+// `metadataBase` makes Open Graph URLs absolute under the canonical site
+// origin without each child route having to repeat the host.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const { locale } = await params
+  if (!hasLocale(locales, locale)) return { title: BRAND.name }
+  const t = await getTranslations({ locale })
+  const localeKey = locale as BrandLocale
+  const localizedBrand = BRAND.nameLocalized[localeKey] ?? BRAND.name
+  const siteUrl = getSiteUrl()
+
+  return {
+    metadataBase: new URL(siteUrl),
+    title: {
+      default: buildPageTitle({ prefix: t("seo.home.title"), brand: localizedBrand }),
+      template: `%s | ${localizedBrand}`,
+    },
+    description: t("seo.home.description"),
+    applicationName: localizedBrand,
+    openGraph: {
+      type: "website",
+      siteName: localizedBrand,
+      locale: locale === "ky" ? "ky_KG" : locale === "en" ? "en_US" : "ru_RU",
+      url: `${siteUrl}/${locale}`,
+      title: buildPageTitle({ prefix: t("seo.home.title"), brand: localizedBrand }),
+      description: t("seo.home.description"),
+    },
+    alternates: {
+      canonical: `${siteUrl}/${locale}`,
+      languages: {
+        ru: `${siteUrl}/ru`,
+        ky: `${siteUrl}/ky`,
+        en: `${siteUrl}/en`,
+      },
+    },
+    robots: { index: true, follow: true },
+  }
 }
 
 // Per Phase 4 D6: this is the de-facto root layout. There is no
@@ -75,6 +121,9 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
           {/* Phase 8 8C: globally-mounted drawer so the Header's desktop
            *  cart-icon button can trigger it on any route. */}
           <CartDrawer locale={locale as Locale} />
+          {/* Phase 11D: Web Vitals → Sentry breadcrumb stream. No-op
+           *  without SENTRY_DSN configured. */}
+          <WebVitalsReporter />
         </AppProviders>
       </body>
     </html>

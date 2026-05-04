@@ -23,6 +23,8 @@ import { type Locale, locales } from "@/i18n/config"
 import { getProductDetail, getRelatedProducts } from "@/lib/api/catalog"
 import type { ProductDetail } from "@/lib/api/types"
 import { BRAND, type BrandLocale } from "@/lib/brand"
+import { JsonLd, breadcrumbListJsonLd, productJsonLd } from "@/lib/seo/jsonld"
+import { getSiteUrl } from "@/lib/seo/site-url"
 import { buildPageTitle } from "@/lib/seo/title"
 
 // PDP — DESIGN §12.6. RSC. Phase 7 7B delivers the above-fold + below-fold
@@ -79,11 +81,8 @@ export async function generateMetadata({ params }: PdpPageProps): Promise<Metada
       ...(primaryImage ? { images: [{ url: primaryImage.large_url ?? primaryImage.url }] } : {}),
     },
     alternates: {
-      languages: {
-        ru: `/ru/products/${slug}`,
-        ky: `/ky/products/${slug}`,
-        en: `/en/products/${slug}`,
-      },
+      canonical: `/${locale}/products/${slug}`,
+      languages: Object.fromEntries(locales.map((l) => [l, `/${l}/products/${slug}`])),
     },
   }
 }
@@ -121,8 +120,25 @@ export default async function PdpPage({ params }: PdpPageProps) {
     })
   }
 
+  // Phase 11B JSON-LD on PDP. Product + BreadcrumbList feed Google's rich
+  // results. `localeKey` is locale narrowed to BrandLocale (validated by
+  // hasLocale above).
+  const localeKey = locale as BrandLocale
+  const siteUrl = getSiteUrl()
+  const breadcrumb = breadcrumbListJsonLd([
+    { name: t("nav.home"), item: `${siteUrl}/${locale}` },
+    { name: t("category.page_title"), item: `${siteUrl}/${locale}/categories` },
+    {
+      name: product.name,
+      item: `${siteUrl}/${locale}/products/${slug}`,
+    },
+  ])
+
   return (
     <main className="mx-auto flex max-w-screen-xl flex-col gap-10 px-4 py-8 md:px-6 md:py-12">
+      <JsonLd value={productJsonLd({ product, locale: localeKey, siteUrl })} />
+      <JsonLd value={breadcrumb} />
+
       <section className="grid gap-6 md:grid-cols-2 md:gap-10">
         <ImageCarousel images={product.images ?? []} alt={product.name} />
 

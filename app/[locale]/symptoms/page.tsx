@@ -1,8 +1,11 @@
+import type { Metadata } from "next"
 import { getTranslations } from "next-intl/server"
 
 import { EmptyState } from "@/components/feedback/EmptyState"
 import { SymptomTile } from "@/components/symptom/SymptomTile"
+import { locales } from "@/i18n/config"
 import { getSymptoms } from "@/lib/api/catalog"
+import { getSiteUrl } from "@/lib/seo/site-url"
 
 // Symptoms index — RSC. Full list of symptoms returned by /api/v1/symptoms,
 // ordered server-side by sort_order. Empty-state when the catalog hasn't
@@ -10,6 +13,20 @@ import { getSymptoms } from "@/lib/api/catalog"
 
 interface SymptomsIndexPageProps {
   params: Promise<{ locale: string }>
+}
+
+export async function generateMetadata({ params }: SymptomsIndexPageProps): Promise<Metadata> {
+  const { locale } = await params
+  const t = await getTranslations({ locale })
+  const siteUrl = getSiteUrl()
+  return {
+    title: t("seo.symptoms.title"),
+    description: t("seo.symptoms.description"),
+    alternates: {
+      canonical: `${siteUrl}/${locale}/symptoms`,
+      languages: Object.fromEntries(locales.map((l) => [l, `${siteUrl}/${l}/symptoms`])),
+    },
+  }
 }
 
 export default async function SymptomsIndexPage({ params }: SymptomsIndexPageProps) {

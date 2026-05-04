@@ -22,6 +22,7 @@
     "types:generate:snapshot": "openapi-typescript ./openapi.json -o generated/api.d.ts",
     "types:check": "pnpm types:generate:snapshot && git diff --exit-code generated/api.d.ts",
     "i18n:check": "node scripts/i18n-check.mjs",
+    "analyze": "ANALYZE=true next build",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -61,6 +62,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.11.3",
     "@eslint/js": "^9.39.4",
+    "@next/bundle-analyzer": "^16.2.4",
     "@next/eslint-plugin-next": "^16.2.4",
     "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4",
@@ -71,6 +73,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.1",
+    "axe-core": "^4.11.4",
     "eslint": "^9.39.4",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react": "^7.37.5",
@@ -85,7 +88,8 @@
     "tailwindcss": "^4",
     "typescript": "^5.5",
     "typescript-eslint": "^8.59.1",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.5",
+    "vitest-axe": "^0.1.0"
   },
   "packageManager": "pnpm@10.33.2"
 }

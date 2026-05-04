@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import { getTranslations } from "next-intl/server"
 import Link from "next/link"
 
@@ -5,7 +6,11 @@ import { CategoryCard } from "@/components/catalog/CategoryCard"
 import { Hero } from "@/components/marketing/Hero"
 import { TrustStrip } from "@/components/marketing/TrustStrip"
 import { SymptomTile } from "@/components/symptom/SymptomTile"
+import { locales } from "@/i18n/config"
 import { getCategoriesTree, getSymptoms } from "@/lib/api/catalog"
+import { type BrandLocale } from "@/lib/brand"
+import { JsonLd, localBusinessJsonLd, organizationJsonLd, websiteJsonLd } from "@/lib/seo/jsonld"
+import { getSiteUrl } from "@/lib/seo/site-url"
 import { cn } from "@/lib/utils"
 
 // Homepage — RSC, DESIGN §12.4 anatomy. Sections top-to-bottom:
@@ -27,9 +32,25 @@ interface HomePageProps {
 const SYMPTOM_LIMIT = 12
 const CATEGORY_LIMIT = 6
 
+export async function generateMetadata({ params }: HomePageProps): Promise<Metadata> {
+  const { locale } = await params
+  const t = await getTranslations({ locale })
+  const siteUrl = getSiteUrl()
+  return {
+    title: t("seo.home.title"),
+    description: t("seo.home.description"),
+    alternates: {
+      canonical: `${siteUrl}/${locale}`,
+      languages: Object.fromEntries(locales.map((l) => [l, `${siteUrl}/${l}`])),
+    },
+  }
+}
+
 export default async function HomePage({ params }: HomePageProps) {
   const { locale } = await params
   const t = await getTranslations()
+  const siteUrl = getSiteUrl()
+  const localeKey = locale as BrandLocale
 
   const [symptoms, categoriesTree] = await Promise.all([
     getSymptoms(locale),
@@ -41,6 +62,15 @@ export default async function HomePage({ params }: HomePageProps) {
 
   return (
     <div className="flex flex-col">
+      {/* Phase 11B JSON-LD: Organization identifies the publisher;
+       *  LocalBusiness pins us as a physical pharmacy in Nookat;
+       *  WebSite advertises the search box (SearchAction). One JsonLd
+       *  block per @type — schema.org doesn't restrict but keeping each
+       *  separate makes Rich Results test diagnostics legible. */}
+      <JsonLd value={organizationJsonLd({ locale: localeKey, siteUrl })} />
+      <JsonLd value={localBusinessJsonLd({ locale: localeKey, siteUrl })} />
+      <JsonLd value={websiteJsonLd({ locale: localeKey, siteUrl })} />
+
       <Hero locale={locale} />
 
       {visibleSymptoms.length > 0 ? (

@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import { ChevronRightIcon, HomeIcon } from "lucide-react"
 import { getTranslations } from "next-intl/server"
 import Link from "next/link"
@@ -9,6 +10,7 @@ import { ProductCard } from "@/components/product/ProductCard"
 import { type Locale, locales } from "@/i18n/config"
 import { hasLocale } from "next-intl"
 import { getSymptomProducts, getSymptoms } from "@/lib/api/catalog"
+import { getSiteUrl } from "@/lib/seo/site-url"
 import { cn } from "@/lib/utils"
 
 // Symptom landing — RSC. Name + product grid. Backend has no
@@ -35,6 +37,24 @@ function parsePage(raw: string | undefined): number {
   if (!raw) return 1
   const parsed = Number.parseInt(raw, 10)
   return Number.isFinite(parsed) && parsed >= 1 ? parsed : 1
+}
+
+export async function generateMetadata({ params }: SymptomLandingPageProps): Promise<Metadata> {
+  const { locale, slug } = await params
+  const symptoms = await getSymptoms(locale)
+  const symptom = symptoms.find((s) => s.slug === slug)
+  const siteUrl = getSiteUrl()
+  const t = await getTranslations({ locale })
+  const baseAlternates = {
+    canonical: `${siteUrl}/${locale}/symptoms/${slug}`,
+    languages: Object.fromEntries(locales.map((l) => [l, `${siteUrl}/${l}/symptoms/${slug}`])),
+  }
+  if (!symptom) return { alternates: baseAlternates }
+  return {
+    title: symptom.name,
+    description: t("seo.symptoms.description"),
+    alternates: baseAlternates,
+  }
 }
 
 export default async function SymptomLandingPage({

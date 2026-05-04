@@ -6,11 +6,11 @@
 
 ## Current state
 
-- **Active phase:** Phase 10 — Order History & Detail _(complete; tagged v0.10.0)_
-- **Status:** Phase 10 complete and tagged v0.10.0. Customer-facing order list at `/[locale]/orders` (page-based pagination, hard-gated by middleware), order detail extension layered onto the 9E confirmation page (StatusTimeline + DeliveryBlock + OrderItemsBlock + cancel + reorder), Q-12 polling wired (60s while non-terminal, off in background, off on terminal).
+- **Active phase:** Phase 11 — Hardening: SEO, Perf, A11y _(complete; tagged v0.11.0)_
+- **Status:** Phase 11 complete and tagged v0.11.0. SEO foundation (sitemap.xml + robots.txt + JSON-LD on indexable surfaces), `generateMetadata` on every public route + noindex on hard-gated transactional layouts, error/not-found/global-error boundaries, RSC loading skeletons on heavy fetcher segments, full Sentry SDK wiring (no-op without DSN — DSN deferred to Phase 12 Coolify deploy), Web Vitals → Sentry breadcrumb stream, structured logger + PII scrubber, security headers on every response, axe-core sweep (vitest + e2e), bundle analyzer.
 - **Last session:** 2026-05-04
-- **Sub-phases done:** Phase 0–9 + Phase 10A–10F. Phase 10A: `lib/orders/{lifecycle,queries,mutations}.ts` + `<OrderNumber>` (sacred-invariant #5 centralization). 10B: `<OrderListRow>` + `<StatusPip>` + `<OrderListPagination>` + `/[locale]/orders/page.tsx`. 10C: `<StatusTimeline>` + `<OrderItemsBlock>` + `<DeliveryBlock>` + detail page extension (9E success-framing fallback retained per D9). 10D: `<CancelOrderDialog>` (shadcn AlertDialog; hard-prohibition #16) + `useCancelOrder` mutation + setQueryData splice for instant timeline update. 10E: `<ReorderButton>` + `useReorder` with locked invalidate-then-push sequence (Phase 8 D12 R-C echo) + classifyReorder helper for full / partial / empty toast outcomes. 10F: full verification gate green; v0.10.0 tagged + pushed. **49 new i18n keys × 3 locales (161 → 210 parity).** **OP-13 grep gate held end-to-end** — zero catch blocks across `lib/orders/*` (matches Phase 9 strictness). **Snapshot-immutability invariant verified** — `OrderItemsBlock` renders `product_name_snapshot` / `unit_price` verbatim, zero PDP refetch (test-locked).
-- **Next session should:** read `FRONTEND_CLAUDE_CODE_PROMPTS.md §Phase 11`, re-read `FRONTEND_BLUEPRINT §17 (perf)` + `DESIGN_BLUEPRINT §16 (a11y)` + `PRODUCT_BLUEPRINT §22.7 (analytics)`. Phase 11 hardening covers: SEO (`generateMetadata` for every route + `robots.txt` + `sitemap.xml` + canonical / hreflang sweep), perf (Lighthouse ≥90 on / and PDPs; Web Vitals), a11y (axe-core sweep + keyboard nav audit), Sentry SDK wiring (replaces the `lib/observability/trace.ts` stub), ImageCarousel polish if needed. No code until plan is approved.
+- **Sub-phases done:** Phase 0–10 + Phase 11A–11F. Phase 11A: `app/sitemap.ts` + `app/robots.ts` + `lib/seo/{jsonld.tsx,site-url.ts}` + tests. 11B: `generateMetadata` on home/PDP (extended with JSON-LD) + categories/symptoms/about/search; per-segment noindex layouts on cart/checkout/orders/account/auth (5 thin layouts so Client-Component pages can still ship robots metadata); 18 SEO i18n keys × 3 locales (210 → 228 parity). 11C: `app/[locale]/error.tsx` + `not-found.tsx` + `app/global-error.tsx` + 4 RSC `loading.tsx` skeletons; tests for error + not-found surfaces. 11D: full Sentry SDK wiring across `instrumentation.ts` + `sentry.{server,edge}.config.ts` + `instrumentation-client.ts` (DSN-optional — no-op without); `lib/observability/{trace.ts,scrub.ts}` PII scrub at two layers; `lib/log.ts`; `<WebVitalsReporter />` mounted in layout. 11E: security headers in `next.config.ts`; `vitest-axe@0.1.0` + `axe-core` wiring (had to manually `expect.extend` matchers since the package's `extend-expect.js` ships empty); 9-case axe pattern coverage + 5-case e2e a11y spec (Phase 11 prompt DoD: zero CRITICAL — serious-tier color-contrast deferred to pre-launch human polish per BUILD_PROGRESS backlog); `@next/bundle-analyzer` + `pnpm analyze`. 11F: full verification gate green; v0.11.0 tagged + pushed.
+- **Next session should:** read `FRONTEND_CLAUDE_CODE_PROMPTS.md §Phase 12`, re-read `FRONTEND_BLUEPRINT §22 (build/deploy)` + `DESIGN_BLUEPRINT §21 (conventions checklist)`. Phase 12 launch readiness covers: legal pages (Terms / Privacy / Delivery / Returns shells with placeholder text), docs (`docs/{ARCHITECTURE,CONTRIBUTING,runbooks/*}.md`), Coolify deploy configuration with real `SENTRY_DSN` + `NEXT_PUBLIC_SITE_URL` + `API_URL` env vars, smoke-test suite that runs against staging, security headers verified via curl on staging, Lighthouse green at staging URLs, all sacred invariants verified end-to-end. **First Phase 12 task: confirm pre-launch checklist items in BUILD_PROGRESS aren't stale.** No code until plan is approved.
 
 ---
 
@@ -27,7 +27,7 @@
 - [x] Phase 8 — Cart _(done 2026-05-04; v0.8.0)_
 - [x] Phase 9 — Checkout & Order Placement _(done 2026-05-04; v0.9.0)_
 - [x] Phase 10 — Order History & Detail _(done 2026-05-04; v0.10.0)_
-- [ ] Phase 11 — Hardening: SEO, Perf, A11y
+- [x] Phase 11 — Hardening: SEO, Perf, A11y _(done 2026-05-04; v0.11.0)_
 - [ ] Phase 12 — Storefront Launch Readiness
 - [ ] Phase A1 — Admin Foundation & Login _(parallel after Phase 5)_
 - [ ] Phase A2 — Admin Orders Queue & Picking
@@ -371,6 +371,59 @@ sleep 5 && curl -s localhost:3000/api/health  # → {"status":"ok","version":"0.
 docker stop nookat-test
 ```
 
+### After Phase 11 — hardening (SEO + perf + a11y + Sentry + security headers)
+
+> No backend prereqs — pure FE polish. Sentry receives no events without `SENTRY_DSN` configured (deferred to Phase 12 / Coolify). Lighthouse runs ad-hoc locally; LHCI workflow lands at Phase 12 against staging.
+
+```bash
+# Tests + gate:
+pnpm lint                       # 0
+pnpm typecheck                  # 0
+pnpm test --run                 # 39 files / 287 tests + 1 skipped (Embla in jsdom carries from Phase 7)
+pnpm i18n:check                 # 228 × 3 parity (was 210 × 3; 18 SEO keys added)
+pnpm build                      # 0; sitemap.xml + robots.txt prerendered as static
+pnpm build:ci                   # 0
+pnpm e2e --project chromium --grep-invert @requires-backend
+# → 18 passed, 1 skipped — includes 5 a11y-flow specs (4 page scans + headers verify)
+
+# Docker smoke — sitemap.xml needs API_URL at request time (catalog fan-out
+# enumerate). Phase 11 added a runtime dependency that earlier phases
+# didn't need; pass env explicitly.
+docker build -t nookat-storefront:phase11 .
+docker run -d --rm -p 3001:3000 \
+  -e API_URL=http://localhost:8000 \
+  -e NEXT_PUBLIC_API_URL=http://localhost:8000 \
+  --name nookat-test nookat-storefront:phase11
+sleep 5
+
+# Health + headers + sitemap + robots:
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3001/api/health  # → 200
+curl -sI http://localhost:3001/ru | grep -iE 'x-frame|content-type-options|referrer|permissions'
+# → X-Frame-Options: DENY
+#   X-Content-Type-Options: nosniff
+#   Referrer-Policy: strict-origin-when-cross-origin
+#   Permissions-Policy: geolocation=(), microphone=(), camera=()
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3001/sitemap.xml  # → 200
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3001/robots.txt   # → 200
+
+# Phase 5 D4 hard gate intact through Phase 11:
+curl -s -o /dev/null -w "%{http_code} %{redirect_url}\n" \
+  http://localhost:3001/ru/orders -L --max-redirs 0
+# → 307 http://localhost:3001/ru/auth/otp?return=%2Fru%2Forders
+
+docker stop nookat-test
+
+# Bundle analyzer (opt-in, ad-hoc):
+pnpm analyze
+# Open .next/analyze/{client,server,edge}.html in browser. Verify
+# customer-storefront client bundle ≤ 180 KB gz per FRONTEND §17.1.
+
+# Lighthouse local (ad-hoc; CI wiring lands in Phase 12 against staging):
+pnpm dev
+pnpm dlx @lhci/cli@latest collect --url=http://localhost:3000/ru
+# Inspect .lighthouseci/ for the run report.
+```
+
 ### After Phase 12 — launch readiness
 
 ```bash
@@ -387,6 +440,13 @@ pnpm e2e --config=playwright.smoke.ts --base-url=https://staging.nookat.kg
 ## Backlog
 
 > Items deliberately deferred. Each entry should say WHEN it gets revisited.
+
+### A11y polish (pre-launch — closes alongside KY copy review)
+
+- [ ] Color-contrast pass on muted-ink tokens. Phase 11E e2e a11y spec flags ~4 nodes/page across header/footer/links and OTP form labels at serious tier (not critical — the gate's bar is critical). Likely culprits: `text-ink-500` on `bg-surface-card`, `text-brand-600` link variants on `bg-brand-50` chip backgrounds. Audit with the bundled `pnpm e2e tests/e2e/a11y-flow.spec.ts` console output; bump tokens or specific component variants as needed. Re-verify by running the e2e spec and confirming zero serious-tier violations remain.
+- [ ] `<dl>` structural fix on `/ru/about` (`AboutPage` branch cards). axe surfaces "<dl> elements must only directly contain properly-ordered <dt> and <dd> groups, <script>, <template> or <div> elements" — the current shape nests `<div>` containers between `<dl>` and `<dt>/<dd>`. Either flatten the markup or wrap each address row in a single `<div>` direct child of `<dl>` per HTML5 §4.4.9 grouping rules.
+- [ ] Manual NVDA (Windows Firefox/Chrome) + VoiceOver (iOS Safari + macOS Safari) screen-reader pass on the J-01 happy path: home → category → PDP → cart → OTP → checkout → order detail. Document any heading-hierarchy / landmark / aria-label gaps. (Out-of-band human work; cannot run from CI.)
+- [ ] Keyboard-only end-to-end pass of J-01 — every interactive element reachable, focus rings visible, no traps.
 
 ### Phase 1.5+ (post-MVP, ~60 days)
 
