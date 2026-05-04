@@ -43,84 +43,118 @@ export interface SymptomProductsParams {
 // header says. Phase 6 6B smoke caught the asymmetric default: a curl with
 // no Accept-Language hitting /ky returned Russian content because we were
 // forwarding the inbound (empty) header instead of the URL locale.
+//
+// Every helper SWALLOWS fetch failures (backend down, network timeout, 5xx)
+// and returns the empty default. This is the "graceful empty state"
+// contract — RSC pages render their EmptyState component when the catalog
+// surface returns nothing, regardless of whether the backend is fully down,
+// returning [], or transient-erroring. The alternative (propagating the
+// throw to error.tsx) makes /ru/categories a hard error page when the
+// backend hiccups, which doesn't match the storefront's "calm and
+// readable" design ethos. Surfaced during Phase 6 close: CI's webserver
+// has no backend at :8000, so the homepage's RSC fetches were 500ing
+// the whole page; this fix makes the empty path the default.
+
+const EMPTY_PRODUCTS_PAGE = (page: number, pageSize: number): ProductsPage => ({
+  items: [],
+  total: 0,
+  page,
+  page_size: pageSize,
+})
 
 export async function getCategoriesTree(locale: string): Promise<CategoryNode[]> {
-  const client = createServerApiClient(locale)
-  const response = await client.GET("/api/v1/categories", {
-    next: { revalidate: REVALIDATE.categoriesTree },
-  } as never)
-  return ((response as { data?: CategoryNode[] }).data ?? []) as CategoryNode[]
+  try {
+    const client = createServerApiClient(locale)
+    const response = await client.GET("/api/v1/categories", {
+      next: { revalidate: REVALIDATE.categoriesTree },
+    } as never)
+    return ((response as { data?: CategoryNode[] }).data ?? []) as CategoryNode[]
+  } catch {
+    return []
+  }
 }
 
 export async function getCategoryDetail(
   slug: string,
   locale: string,
 ): Promise<CategoryDetail | null> {
-  const client = createServerApiClient(locale)
-  const response = await client.GET("/api/v1/categories/{slug}", {
-    params: { path: { slug } },
-    next: { revalidate: REVALIDATE.categoryDetail },
-  } as never)
-  return ((response as { data?: CategoryDetail }).data ?? null) as CategoryDetail | null
+  try {
+    const client = createServerApiClient(locale)
+    const response = await client.GET("/api/v1/categories/{slug}", {
+      params: { path: { slug } },
+      next: { revalidate: REVALIDATE.categoryDetail },
+    } as never)
+    return ((response as { data?: CategoryDetail }).data ?? null) as CategoryDetail | null
+  } catch {
+    return null
+  }
 }
 
 export async function getCategoryProducts(
   locale: string,
   { slug, page = 1, pageSize = 24, sort = "relevance", inStockOnly = true }: CategoryProductsParams,
 ): Promise<ProductsPage> {
-  const client = createServerApiClient(locale)
-  const response = await client.GET("/api/v1/categories/{slug}/products", {
-    params: {
-      path: { slug },
-      query: {
-        page,
-        page_size: pageSize,
-        sort,
-        in_stock_only: inStockOnly,
+  try {
+    const client = createServerApiClient(locale)
+    const response = await client.GET("/api/v1/categories/{slug}/products", {
+      params: {
+        path: { slug },
+        query: {
+          page,
+          page_size: pageSize,
+          sort,
+          in_stock_only: inStockOnly,
+        },
       },
-    },
-    next: { revalidate: REVALIDATE.categoryProducts },
-  } as never)
-  return ((response as { data?: ProductsPage }).data ?? {
-    items: [],
-    total: 0,
-    page,
-    page_size: pageSize,
-  }) as ProductsPage
+      next: { revalidate: REVALIDATE.categoryProducts },
+    } as never)
+    return ((response as { data?: ProductsPage }).data ??
+      EMPTY_PRODUCTS_PAGE(page, pageSize)) as ProductsPage
+  } catch {
+    return EMPTY_PRODUCTS_PAGE(page, pageSize)
+  }
 }
 
 export async function getSymptoms(locale: string): Promise<Symptom[]> {
-  const client = createServerApiClient(locale)
-  const response = await client.GET("/api/v1/symptoms", {
-    next: { revalidate: REVALIDATE.symptomsList },
-  } as never)
-  return ((response as { data?: Symptom[] }).data ?? []) as Symptom[]
+  try {
+    const client = createServerApiClient(locale)
+    const response = await client.GET("/api/v1/symptoms", {
+      next: { revalidate: REVALIDATE.symptomsList },
+    } as never)
+    return ((response as { data?: Symptom[] }).data ?? []) as Symptom[]
+  } catch {
+    return []
+  }
 }
 
 export async function getSymptomProducts(
   locale: string,
   { slug, page = 1, pageSize = 24, inStockOnly = true }: SymptomProductsParams,
 ): Promise<ProductsPage> {
-  const client = createServerApiClient(locale)
-  const response = await client.GET("/api/v1/symptoms/{slug}/products", {
-    params: {
-      path: { slug },
-      query: { page, page_size: pageSize, in_stock_only: inStockOnly },
-    },
-    next: { revalidate: REVALIDATE.symptomProducts },
-  } as never)
-  return ((response as { data?: ProductsPage }).data ?? {
-    items: [],
-    total: 0,
-    page,
-    page_size: pageSize,
-  }) as ProductsPage
+  try {
+    const client = createServerApiClient(locale)
+    const response = await client.GET("/api/v1/symptoms/{slug}/products", {
+      params: {
+        path: { slug },
+        query: { page, page_size: pageSize, in_stock_only: inStockOnly },
+      },
+      next: { revalidate: REVALIDATE.symptomProducts },
+    } as never)
+    return ((response as { data?: ProductsPage }).data ??
+      EMPTY_PRODUCTS_PAGE(page, pageSize)) as ProductsPage
+  } catch {
+    return EMPTY_PRODUCTS_PAGE(page, pageSize)
+  }
 }
 
 export async function getBranches(locale: string): Promise<Branch[]> {
-  const client = createServerApiClient(locale)
-  const response = await client.GET("/api/v1/branches", {
-    next: { revalidate: REVALIDATE.branches },
-  } as never)
-  return ((response as { data?: Branch[] }).data ?? []) as Branch[]
+  try {
+    const client = createServerApiClient(locale)
+    const response = await client.GET("/api/v1/branches", {
+      next: { revalidate: REVALIDATE.branches },
+    } as never)
+    return ((response as { data?: Branch[] }).data ?? []) as Branch[]
+  } catch {
+    return []
+  }
 }
