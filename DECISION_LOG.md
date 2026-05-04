@@ -264,3 +264,22 @@
 **Reversibility.** All decisions are component-local and easily revisited. The biggest "chunk" is the locale plumbing in `lib/api/server.ts` + `lib/api/catalog.ts` — if next-intl or the backend ever standardize on a different locale-resolution channel, the change is centralized in those two files.
 
 **References.** `DESIGN_BLUEPRINT §11.3 / §12.1-§12.5 / §8.4`; `FRONTEND_BLUEPRINT §6 / §15.2 / §22`; `PRODUCT_BLUEPRINT §5 / §7.1 / §8.2 / §12 (Search & Discovery — note: spec calls this §12, not §17 as the original prompt cited)`; `FRONTEND_CLAUDE_CODE_PROMPTS §Phase 6`; backend `app/api/v1/{categories,symptoms,branches}.py`, `app/domain/catalog/storefront.py`, `app/domain/catalog/storefront_schemas.py`. Phase 6 plan in chat 2026-05-04.
+
+---
+
+### 2026-05-04 — Phase 7 deps: embla-carousel-react + shadcn Accordion
+**Phase:** 7 (sub-phase 7B)
+**Context.** Phase 7's PDP needs an `ImageCarousel` (DESIGN §12.6 + §8.3 — square crop, touch-swipe on mobile, prev/next on desktop, thumbnail strip, LCP-aware `priority` on the first image) and a `ProductDescriptionTabs` component that switches between Tabs (desktop) and Accordion (mobile) per Phase 7 plan D2. Phase 2 installed shadcn Tabs but not Accordion; Phase 7 adds Accordion + a carousel primitive.
+
+**Decisions.**
+- **Embla Carousel** (`embla-carousel-react@^8.6.0`, ~5KB gz). Picked because hand-rolling carousel touch + keyboard a11y + reduced-motion is 50+ LOC of subtle bugs (the user's framing — "you'll be debugging at 11pm before launch"). Embla is the de-facto choice for shadcn Carousel and integrates with Radix focus management. Confirmed by user.
+- **Shadcn Accordion** added via `pnpm dlx shadcn@latest add accordion -y -o` — single component, thin Radix wrapper, no extra dep beyond Radix Accordion (already pulled in by other shadcn primitives). Output: `components/ui/accordion.tsx`. No customization needed at install time.
+- **No shadcn Carousel wrapper.** shadcn ships a `<Carousel>` wrapper around Embla (`components/ui/carousel.tsx`); we deliberately skip it. Reasons: (a) the wrapper's API is generic and our `ImageCarousel` is product-specific (knows about `StorefrontImage[]` shape, primary/thumbnails, `priority` on first), (b) installing it would prompt-overwrite our Phase 2 customized button.tsx, and (c) the wrapper's value-add is a lightweight prev/next button styling we already get from our Button + lucide chevron pattern. Building `ImageCarousel` directly on Embla's `useEmblaCarousel` hook is ~80 LOC and skips one indirection.
+
+**Reversibility.**
+- **Embla escape hatch.** If Embla becomes a maintenance burden (regressions on new Next/React, abandoned upstream, perf regression on mid-range Android), swap to vanilla touch + CSS `scroll-snap-type` + an IntersectionObserver-based active-indicator in Phase 11 hardening. Estimated swap cost: 1 day. The `ImageCarousel` component's external API (props: `images: StorefrontImage[]`, `priority`) doesn't expose Embla types, so swap doesn't ripple to consumers.
+- **Accordion escape hatch.** Accordion is just a Radix wrapper; if shadcn's styling drifts in a future major, we own `components/ui/accordion.tsx` outright (shadcn's "copy-paste owned" model from Phase 2 D4).
+
+**Cost.** package.json + lockfile churn; ~5KB gz on PDP route. Within the 17.1 perf budget.
+
+**References.** `FRONTEND_CLAUDE_CODE_PROMPTS §Phase 7.4.2`; user message authorizing Embla 2026-05-04 (Q4 of Phase 7 plan response); CLAUDE.md hard prohibition #14 (new top-level dep gets a DECISION_LOG entry).
