@@ -36,10 +36,17 @@ const intlMiddleware = createMiddleware({
 
 const REFRESH_COOKIE = "nookat_refresh"
 
+// Phase 9 9A.2: `/checkout` joins the hard-gated list. Backend's
+// POST /api/v1/checkout/place requires CurrentUser per Phase 9 research
+// finding G.2 — guest checkout is impossible. The OTP gate is the auth
+// wall described in PRODUCT §7.1 J-01 step 6. The Phase 8 cart-merge
+// sequence at OTP-verify success preserves cart contents across this
+// transition.
 const HARD_GATED: ReadonlyArray<RegExp> = [
   /^\/(?:ru|ky|en)\/account(?:\/|$)/,
   /^\/(?:ru|ky|en)\/orders(?:\/|$)/,
   /^\/(?:ru|ky|en)\/me(?:\/|$)/,
+  /^\/(?:ru|ky|en)\/checkout(?:\/|$)/,
 ]
 
 function isHardGated(pathname: string): boolean {

@@ -55,7 +55,11 @@ export type CartItemUpdate = components["schemas"]["CartItemUpdate"]
 // ---------------------------------------------------------------------------
 // Checkout + orders
 // ---------------------------------------------------------------------------
+export type CheckoutQuoteRequest = components["schemas"]["CheckoutQuoteRequest"]
 export type CheckoutQuote = components["schemas"]["CheckoutQuoteResponse"]
+export type StockConflict = components["schemas"]["StockConflict"]
+export type PriceConflict = components["schemas"]["PriceConflict"]
+export type PlaceOrderAddress = components["schemas"]["PlaceOrderAddress"]
 export type PlaceOrderRequest = components["schemas"]["PlaceOrderRequest"]
 export type PlaceOrderResponse = components["schemas"]["PlaceOrderResponse"]
 export type OrderRead = components["schemas"]["OrderRead"]
