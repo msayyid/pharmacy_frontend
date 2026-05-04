@@ -90,17 +90,33 @@ pnpm dev
 
 ### After Phase 5 — auth flow live (J-01 partial)
 
-> **Backend setup (run once before the smoke + before the @requires-backend e2e):**
+> **Backend prerequisites (do these once on a fresh machine BEFORE `make dev`):**
 >
 > ```bash
+> # 1. Free port 3306. MAMP, brew-services mysql, Docker Desktop's reused
+> #    MySQL — any of them will keep the backend's MySQL container from
+> #    binding. Symptom: `make docker-up` succeeds but the API can't connect.
+> brew services stop mysql 2>/dev/null
+> brew services stop mariadb 2>/dev/null
+> # If MAMP is running, stop it from MAMP > Stop Servers.
+>
+> # 2. Bring up the dependency containers (MySQL + Redis).
 > cd ../pharmacy_backend
-> make docker-up                  # Postgres + Redis containers
-> make dev                        # uvicorn on :8000, logs to stdout
+> make docker-up
+>
+> # 3. Run Alembic migrations. The container starts with an EMPTY database;
+> #    every backend route that touches a table 500s until this is run.
+> #    This is the step that bit us during Phase 5's manual smoke.
+> make migrate                    # or: uv run alembic upgrade head
+>
+> # 4. Start the API.
+> make dev                        # uvicorn on :8000
+>
 > # In a second terminal, capture the log to a file the e2e helper can fish:
 > make dev 2>&1 | tee /tmp/backend.log
 > ```
 >
-> The e2e helper (`tests/e2e/auth-flow.spec.ts`) defaults to `BACKEND_LOG_PATH=/tmp/backend.log` and `BACKEND_OTP_CMD=tail -n 200 $BACKEND_LOG_PATH | grep -oE 'code["=:]+[0-9]{6}' | tail -n 1 | grep -oE '[0-9]{6}'`. Override either env var if your backend log shape differs. The `PHARMACY_BACKEND_SMS_PROVIDER=fake` default keeps OTP codes flowing to the log without actually hitting Nikita.
+> The e2e helper (`tests/e2e/auth-flow.spec.ts`) defaults to `BACKEND_LOG_PATH=/tmp/backend.log` and `BACKEND_OTP_CMD=tail -n 200 $BACKEND_LOG_PATH | grep -oE 'code[^0-9]{1,5}[0-9]{6}' | tail -n 1 | grep -oE '[0-9]{6}'`. Override either env var if your backend log shape differs. The `PHARMACY_BACKEND_SMS_PROVIDER=fake` default keeps OTP codes flowing to the log without actually hitting Nikita.
 
 ```bash
 # Manual smoke (storefront on :3000, backend on :8000)
